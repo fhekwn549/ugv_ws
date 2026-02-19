@@ -1,0 +1,382 @@
+<?xml version="1.0" ?>
+<robot name="waver"
+  xmlns:xacro="http://ros.org/wiki/xacro">
+
+  <!-- Init colour -->
+  <material name="black">
+      <color rgba="0.0 0.0 0.0 1.0"/>
+  </material>
+
+  <material name="dark">
+    <color rgba="0.3 0.3 0.3 1.0"/>
+  </material>
+
+  <material name="light_black">
+    <color rgba="0.4 0.4 0.4 1.0"/>
+  </material>
+
+  <material name="blue">
+    <color rgba="0.0 0.0 0.8 1.0"/>
+  </material>
+
+  <material name="green">
+    <color rgba="0.0 0.8 0.0 1.0"/>
+  </material>
+
+  <material name="grey">
+    <color rgba="0.5 0.5 0.5 1.0"/>
+  </material>
+
+  <material name="orange">
+    <color rgba="1.0 0.4235 0.0392 1.0"/>
+  </material>
+
+  <material name="brown">
+    <color rgba="0.8706 0.8118 0.7647 1.0"/>
+  </material>
+
+  <material name="red">
+    <color rgba="0.8 0.0 0.0 1.0"/>
+  </material>
+
+  <material name="white">
+    <color rgba="1.0 1.0 1.0 1.0"/>
+  </material>
+
+  <!-- Body -->
+  <link name="base_footprint"/>
+
+  <joint name="base_joint" type="fixed">
+    <parent link="base_footprint"/>
+    <child link="base_link"/>
+    <origin xyz="0.0 0.0 33.7e-3" rpy="0 0 0" />
+  </joint>
+
+  <link name="base_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 1.5708" />
+      <geometry>
+        <mesh filename="package://waver_gazebo/models/waver_common/meshes/base_link.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="dark"/>
+    </visual>
+
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 1.5708" />
+      <geometry>
+        <box size="0.140 0.140 0.143"/>
+      </geometry>
+    </collision>
+
+    <inertial>
+      <mass value="0.37038398045076265" />
+      <origin xyz="2.838767506182194e-05 -6.582658272236586e-06 0.002703800678253174" rpy="0 0 1.5708" />
+      <inertia ixx="0.0008255973835920386" iyy="0.0005293282898445326" izz="0.0013315199498696443" ixy="0.0" iyz="0.0" ixz="0.0" />
+    </inertial>
+  </link>
+  
+   <!-- ========================================================= -->
+  <!-- [추가] top_shell/accessories/oled 링크 (2번 코드에서 가져온 부분) -->
+  <!-- ========================================================= -->
+
+  <link name="top_shell_link">
+    <inertial>
+      <mass value="0.7277708834628859" />
+      <!-- TODO: 질량중심 맞추기 -->
+      <origin xyz="0.00018196851015090943 -0.0006833337545394898 0.038709537506103515" rpy="0 0 1.5708" />
+      <inertia ixx="0.0022122780308922725" iyy="0.0018048674350663336"
+               izz="0.003659349844340526" ixy="0.0" iyz="0.0" ixz="0.0" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 1.5708" />
+      <geometry>
+        <mesh filename="package://waver_gazebo/models/waver_common/meshes/top_shell_link.stl"
+              scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="dark"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 1.5708" />
+      <geometry>
+        <mesh filename="package://waver_gazebo/models/waver_common/meshes/top_shell_link.stl"
+              scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+
+  <link name="accessories_link">
+    <inertial>
+      <mass value="0.0017616158924187116" />
+      <!-- TODO: 질량중심 맞추기 -->
+      <origin xyz="-0.02246641731262207 0.08693458557128907 0.04861989974975586" rpy="0 0 1.5708" />
+      <inertia ixx="2.2622278969724113e-07" iyy="7.36227380617578e-07"
+               izz="7.362274117066844e-07" ixy="0.0" iyz="0.0" ixz="0.0" />
+    </inertial>
+    <visual>
+      <!-- TODO: accessories 위치 맞추기 -->
+      <origin xyz="0.08693458557128907 0.02246641731262207 -0.04861989974975586" rpy="0 0 1.5708" />
+      <geometry>
+        <mesh filename="package://waver_gazebo/models/waver_common/meshes/accessories_link.stl"
+              scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="black"/>
+    </visual>
+    <collision>
+      <origin xyz="0.08693458557128907 0.02246641731262207 -0.04861989974975586" rpy="0 0 1.5708" />
+      <geometry>
+        <mesh filename="package://waver_gazebo/models/waver_common/meshes/accessories_link.stl"
+              scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+
+  <link name="accessories1_link">
+    <inertial>
+      <mass value="0.0021489822783274555" />
+      <origin xyz="-0.002510018587112427 0.07360986328125002 0.035275302886962887" rpy="0 0 1.5708" />
+      <inertia ixx="1.8160055789601745e-07" iyy="8.100907081280738e-07"
+               izz="8.100806017664777e-07" ixy="0.0" iyz="0.0" ixz="0.0" />
+    </inertial>
+    <visual>
+      <origin xyz="0.07360986328125002 0.002510018587112427 -0.035275302886962887" rpy="0 0 1.5708" />
+      <geometry>
+        <mesh filename="package://waver_gazebo/models/waver_common/meshes/accessories1_link.stl"
+              scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="black"/>
+    </visual>
+    <collision>
+      <origin xyz="0.07360986328125002 0.002510018587112427 -0.035275302886962887" rpy="0 0 1.5708" />
+      <geometry>
+        <mesh filename="package://waver_gazebo/models/waver_common/meshes/accessories1_link.stl"
+              scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+
+  <link name="oled_screen_link">
+    <inertial>
+      <mass value="0.0014091265350616076" />
+      <!-- TODO: 질량중심 맞추기 -->
+      <origin xyz="-6.735318456776441e-07 0.05096461868286133 0.048232952117919926" rpy="0 0 1.5708" />
+      <inertia ixx="3.186534864702538e-08" iyy="2.5666330224105178e-07"
+               izz="2.7215400443770056e-07" ixy="0.0" iyz="0.0" ixz="0.0" />
+    </inertial>
+    <visual>
+      <!-- TODO: oled 위치 맞추기 -->
+      <origin xyz="0.05096461868286133 6.735318456776441e-07 -0.048232952117919926" rpy="0 0 1.5708" />
+      <geometry>
+        <mesh filename="package://waver_gazebo/models/waver_common/meshes/oled_screen_link.stl"
+              scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="blue"/>
+    </visual>
+    <collision>
+      <origin xyz="0.05096461868286133 6.735318456776441e-07 -0.048232952117919926" rpy="0 0 1.5708" />
+      <geometry>
+        <mesh filename="package://waver_gazebo/models/waver_common/meshes/oled_screen_link.stl"
+              scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  
+  <!-- ============================= -->
+  <!-- top_shell/accessories/oled 연결 joint (xacro 값 반영) -->
+  <!-- ============================= -->
+
+  <joint name="base_top_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="top_shell_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <joint name="top_acces_joint" type="fixed">
+    <parent link="top_shell_link"/>
+    <child link="accessories_link"/>
+    <origin xyz="-0.08693458557128907 -0.02246641731262207 0.04861989974975586" rpy="0 0 0"/>
+  </joint>
+
+  <joint name="top_screen_joint" type="fixed">
+    <parent link="top_shell_link"/>
+    <child link="oled_screen_link"/>
+    <origin xyz="-0.05096461868286133 -6.735318456776441e-07 0.048232952117919926" rpy="0 0 0"/>
+  </joint>
+  
+  <joint name="top_acces1_joint" type="fixed">
+    <parent link="top_shell_link"/>
+    <child link="accessories1_link"/>
+    <origin xyz="-0.07360986328125002 -0.002510018587112427 0.035275302886962887" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Continuous -->
+  <joint name="wheel_back_left_joint" type="continuous">
+    <origin xyz="-0.04859128189086914 0.06538582611083985 0.004798986434936523" rpy="0 0 0" />
+    <parent link="base_link" />
+    <child link="wheel_back_left_link" />
+    <axis xyz="0 1 0" />
+  </joint>
+
+  <link name="wheel_back_left_link">
+    <inertial>
+      <mass value="1.01701435808657" />
+      <origin xyz="0 0 0" rpy="0 0 1.5708" />
+      <inertia ixx="0.0011153598236428852" iyy="0.0007115715200341761" izz="0.0007099489264864056" ixy="0.0" iyz="0.0" ixz="0.0" />
+    </inertial>
+    <visual>
+      <!-- <origin xyz="0 0 0" rpy="0 0 1.5708" /> -->
+      <origin xyz="0.04859128189086914 -0.06538582611083985 -0.004798986434936523" rpy="0 0 1.5708" />
+      <geometry>
+        <mesh filename="package://waver_gazebo/models/waver_common/meshes/rear_left_wheel_link.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="dark"/>
+    </visual>
+    <collision>
+      <!-- <origin xyz="0 0 0" rpy="0 0 1.5708" /> -->
+      <origin xyz="0.04859128189086914 -0.06538582611083985 -0.004798986434936523" rpy="0 0 1.5708" />
+      <geometry>
+        <mesh filename="package://waver_gazebo/models/waver_common/meshes/rear_left_wheel_link.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="wheel_front_left_joint" type="continuous">
+    <origin xyz="0.048406845092773446 0.06538582611083985 0.004799012184143066" rpy="0 0 0" />
+    <parent link="base_link" />
+    <child link="wheel_front_left_link" />
+    <axis xyz="0 1 0" />
+  </joint>
+
+  <link name="wheel_front_left_link">
+    <inertial>
+      <mass value="1.0170155374515382" />
+      <origin xyz="0 0 0" rpy="0 0 1.5708" />
+      <inertia ixx="0.0011153873944048257" iyy="0.0007115715200341761" izz="0.0007099764972483459" ixy="0.0" iyz="0.0" ixz="0.0" />
+    </inertial>
+    <visual>
+      <!-- <origin xyz="0 0 0" rpy="0 0 1.5708" /> -->
+      <origin xyz="-0.048406845092773446 -0.06538582611083985 -0.004799012184143066" rpy="0 0 1.5708" />
+      <geometry>
+        <mesh filename="package://waver_gazebo/models/waver_common/meshes/front_left_wheel_link.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="dark"/>
+    </visual>
+    <collision>
+      <!-- <origin xyz="0 0 0" rpy="0 0 1.5708" /> -->
+      <origin xyz="-0.048406845092773446 -0.06538582611083985 -0.004799012184143066" rpy="0 0 1.5708" />
+      <geometry>
+        <mesh filename="package://waver_gazebo/models/waver_common/meshes/front_left_wheel_link.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="wheel_front_right_joint" type="continuous">
+    <origin xyz="0.048593093872070316 -0.06528724670410156 0.004798998355865478" rpy="0 0 0" />
+    <parent link="base_link" />
+    <child link="wheel_front_right_link" />
+    <axis xyz="0 1 0" />
+  </joint>
+
+    <link name="wheel_front_right_link">
+    <inertial>
+      <mass value="1.0170112199417978" />
+      <origin xyz="0 0 0" rpy="0 0 1.5708" />
+      <inertia ixx="0.0011153598236428852" iyy="0.0007115715475157099" izz="0.0007099489539679392" ixy="0.0" iyz="0.0" ixz="0.0" />
+    </inertial>
+    <visual>
+      <!-- <origin xyz="0 0 0" rpy="0 0 1.5708" /> -->
+      <origin xyz="-0.048593093872070316 0.06528724670410156 -0.004798998355865478" rpy="0 0 1.5708" />
+      <geometry>
+        <mesh filename="package://waver_gazebo/models/waver_common/meshes/front_right_wheel_link.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="dark"/>
+    </visual>
+    <collision>
+      <!-- <origin xyz="0 0 0" rpy="0 0 1.5708" /> -->
+      <origin xyz="-0.048593093872070316 0.06528724670410156 -0.004798998355865478" rpy="0 0 1.5708" />
+      <geometry>
+        <mesh filename="package://waver_gazebo/models/waver_common/meshes/front_right_wheel_link.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="wheel_back_right_joint" type="continuous">
+    <origin xyz="-0.04840502166748047 -0.0652872543334961 0.004799028396606446" rpy="0 0 0" />
+    <parent link="base_link" />
+    <child link="wheel_back_right_link" />
+    <axis xyz="0 1 0" />
+  </joint>
+
+  <link name="wheel_back_right_link">
+    <inertial>
+      <mass value="1.0170123141691128" />
+      <origin xyz="0 0 0" rpy="0 0 1.5708" />
+      <inertia ixx="0.0011153873944048257" iyy="0.0007115715475157099" izz="0.0007099765247298796" ixy="0.0" iyz="0.0" ixz="0.0" />
+    </inertial>
+    <visual>
+      <!-- <origin xyz="0 0 0" rpy="0 0 1.5708" /> -->
+      <origin xyz="0.04840502166748047 0.0652872543334961 -0.004799028396606446" rpy="0 0 1.5708" />
+      <geometry>
+        <mesh filename="package://waver_gazebo/models/waver_common/meshes/rear_right_wheel_link.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="dark"/>
+    </visual>
+    <collision>
+      <!-- <origin xyz="0 0 0" rpy="0 0 1.5708" /> -->
+      <origin xyz="0.04840502166748047 0.0652872543334961 -0.004799028396606446" rpy="0 0 1.5708" />
+      <geometry>
+        <mesh filename="package://waver_gazebo/models/waver_common/meshes/rear_right_wheel_link.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+
+  <!-- IMU -->
+  <joint name="imu_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="imu_link"/>
+    <origin xyz="-0.009279213905334474 -0.009815516471862793 0.04129100418090821" rpy="0 0 0"/>
+  </joint>
+
+  <link name="imu_link">
+    <visual>
+      <origin xyz="0.009279213905334474 0.009815516471862793 -0.04129100418090821" rpy="0 0 1.5708"/>
+      <geometry>
+       <mesh filename="package://waver_gazebo/models/waver_common/meshes/board_link.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="green"/>
+    </visual>
+  </link>
+
+  <!-- lidar -->
+  <joint name="scan_joint" type="fixed">
+    <parent link="top_shell_link"/>
+    <child link="base_laser"/>
+    <origin xyz="0.04 0 0.0798" rpy="0 0 0"/>
+  </joint>
+
+  <link name="base_laser">
+    <visual>
+      <!-- <origin xyz="0 0 0" rpy="0 0 1.5708"/> -->
+      <origin xyz="0 0 -0.027" rpy="0 0 1.5708"/>
+      <geometry>
+        <mesh filename="package://waver_gazebo/models/waver_common/meshes/LD19.stl" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="dark"/>
+    </visual>
+
+    <!-- chuhndor -->
+    <!-- <collision>
+      <origin xyz="0 0 -0.027" rpy="0 0 1.5708"/>
+      <geometry>
+        <cylinder length="0.0315" radius="0.055"/>
+      </geometry>
+    </collision> -->
+    <!-- chuhndor -->
+
+    <inertial>
+      <mass value="0.05" />
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="1.3010226e-05" iyy="1.6209553e-05" izz="2.1055697e-05" ixy="0.0" iyz="0.0" ixz="0.0" />
+    </inertial>
+  </link>
+
+</robot>
