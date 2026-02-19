@@ -2,6 +2,29 @@
 
 > Fork of [waveshareteam/ugv_ws](https://github.com/waveshareteam/ugv_ws) with RoArm-M2 integration.
 
+## 이 리포의 역할
+
+**로봇을 구동하는 드라이버 코드**를 관리합니다. 시리얼 통신으로 하드웨어(모터, 센서, 로봇팔)를 직접 제어하는 ROS 2 노드들이 포함되어 있습니다.
+
+주로 **RPi에서 실행**되며, 로봇의 URDF 모델이나 시뮬레이션, launch 파일은 별도 리포([ugv_roarm_description](https://github.com/fhekwn549/ugv_roarm_description))에서 관리합니다.
+
+### 리포 구조
+
+| 리포 | 역할 | 내용 |
+|------|------|------|
+| **이 리포 (`ugv_ws`)** | 하드웨어 구동 | 시리얼 드라이버, 센서 처리, 오도메트리 |
+| [ugv_roarm_description](https://github.com/fhekwn549/ugv_roarm_description) | 로봇 정의 + 실행 구성 | URDF, launch, Gazebo 시뮬레이션, 텔레옵 |
+
+RPi에서는 두 리포 모두 필요합니다. `ugv_roarm_description`의 `rasp_bringup.launch.py`가 이 리포의 드라이버 노드들을 실행합니다.
+
+### 시리얼 포트 매핑 (RPi)
+
+| 포트 | 장치 | 드라이버 노드 |
+|------|------|--------------|
+| `/dev/ttyAMA0` | UGV 바퀴 ESP32 | `ugv_driver` |
+| `/dev/ttyUSB0` | RoArm-M2 ESP32 | `roarm_driver` |
+| `/dev/ttyUSB1` | LDLidar (STL-19P) | `ldlidar_ros2` |
+
 ## Changes from upstream
 
 ### Added: `roarm_driver` (in `ugv_bringup`)
@@ -17,9 +40,23 @@ RoArm-M2 로봇팔을 시리얼(`/dev/ttyUSB0`)로 제어하는 ROS 2 드라이�
 
 - `wheel_separation` 파라미터 추가 (기존 하드코딩 0.175 → 파라미터화)
 
-### Related repo
+## 배포 (WSL → RPi)
 
-- [fhekwn549/ugv_roarm_description](https://github.com/fhekwn549/ugv_roarm_description) — URDF, launch, Gazebo, 텔레옵
+```bash
+# WSL: push
+cd ~/ugv_ws
+git push origin ros2-humble-develop
+
+# RPi: pull & build
+cd ~/ugv_ws
+git pull origin ros2-humble-develop
+cd src/ugv_main/ugv_roarm_description
+git pull origin main
+cd ~/ugv_ws
+colcon build --packages-select ugv_bringup ugv_roarm_description
+source install/setup.bash
+ros2 launch ugv_roarm_description rasp_bringup.launch.py
+```
 
 ---
 
