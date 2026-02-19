@@ -1,4 +1,29 @@
-# ugv_ws Workspace Description (Stable)
+# ugv_ws (Fork)
+
+> Fork of [waveshareteam/ugv_ws](https://github.com/waveshareteam/ugv_ws) with RoArm-M2 integration.
+
+## Changes from upstream
+
+### Added: `roarm_driver` (in `ugv_bringup`)
+
+RoArm-M2 로봇팔을 시리얼(`/dev/ttyUSB0`)로 제어하는 ROS 2 드라이버 노드.
+
+- **Subscribe**: `/arm_controller/joint_trajectory` (JointTrajectory) → T:102 시리얼 명령
+- **Subscribe**: `/roarm/gripper_cmd` (Float64) → T:106 그리퍼 명령
+- **Publish**: `/joint_states` (JointState) ← T:105 주기적 조회 (5Hz)
+- **Parameters**: `serial_port` (default: `/dev/ttyUSB0`), `baud_rate` (115200), `feedback_rate` (5.0)
+
+### Modified: `base_node` / `base_node_ekf`
+
+- `wheel_separation` 파라미터 추가 (기존 하드코딩 0.175 → 파라미터화)
+
+### Related repo
+
+- [fhekwn549/ugv_roarm_description](https://github.com/fhekwn549/ugv_roarm_description) — URDF, launch, Gazebo, 텔레옵
+
+---
+
+# Original README (ugv_ws Workspace Description)
 
 1.Environment
 
