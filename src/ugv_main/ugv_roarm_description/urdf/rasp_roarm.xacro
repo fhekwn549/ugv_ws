@@ -1,0 +1,424 @@
+<?xml version="1.0" ?>
+<robot name="rasp_roarm" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- ============================================================ -->
+  <!--  Rasp Rover Base (Pan-Tilt removed, RoArm-M2 mounted)       -->
+  <!-- ============================================================ -->
+
+  <link name="base_footprint"></link>
+
+  <link name="base_link">
+    <inertial>
+      <origin xyz="-0.000162422869269728 4.57988681701327E-15 0.0452361557646266" rpy="0 0 0" />
+      <mass value="1.04143299444137" />
+      <inertia ixx="0.00130964432205038" ixy="-2.24104232540393E-17" ixz="2.87884702855107E-05"
+               iyy="0.00259816035443436" iyz="-1.97265629397348E-17" izz="0.00240218497851418" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ugv_roarm_description/meshes/rasp_rover/base_link.stl" />
+      </geometry>
+      <material name="">
+        <color rgba="0.627450980392157 0.627450980392157 0.627450980392157 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ugv_roarm_description/meshes/rasp_rover/base_link.stl" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="base_joint" type="fixed">
+    <parent link="base_footprint"/>
+    <child link="base_link"/>
+    <origin xyz="0.000460087791654118 6.50856019576702E-10 0.02825" rpy="0 0 0"/>
+  </joint>
+
+  <!-- IMU -->
+  <link name="base_imu_link">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </link>
+  <joint name="imu_joint" type="fixed">
+    <parent link="base_link" />
+    <child link="base_imu_link" />
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <!-- ==================== Wheels ==================== -->
+
+  <!-- Left Up Wheel -->
+  <link name="left_up_wheel_link">
+    <inertial>
+      <origin xyz="-6.24500451351651E-16 0.0267900126654631 0" rpy="0 0 0" />
+      <mass value="0.210587238755431" />
+      <inertia ixx="0.000115401806837977" ixy="-1.32501719335198E-18" ixz="-4.34981020424034E-35"
+               iyy="0.000168890965481856" iyz="2.371691443642E-21" izz="0.000115401806837977" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ugv_description/meshes/rasp_rover/left_up_wheel_link.stl" scale="0.875 1.0 0.875" />
+      </geometry>
+      <material name="">
+        <color rgba="0.627450980392157 0.627450980392157 0.627450980392157 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ugv_description/meshes/rasp_rover/left_up_wheel_link.stl" scale="0.875 1.0 0.875" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="left_up_wheel_link_joint" type="continuous">
+    <origin xyz="0.0494657123506755 0.0380100014305094 0.00674802802973084" rpy="0 0 0" />
+    <parent link="base_link" />
+    <child link="left_up_wheel_link" />
+    <axis xyz="0 -1 0" />
+  </joint>
+
+  <!-- Left Down Wheel -->
+  <link name="left_down_wheel_link">
+    <inertial>
+      <origin xyz="-6.27969898303604E-16 0.0267900126654662 0" rpy="0 0 0" />
+      <mass value="0.210587238755431" />
+      <inertia ixx="0.000115401806837977" ixy="-1.32808581259249E-18" ixz="1.27628957046806E-32"
+               iyy="0.000168890965481856" iyz="-5.16307112015383E-19" izz="0.000115401806837977" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ugv_description/meshes/rasp_rover/left_down_wheel_link.stl" scale="0.875 1.0 0.875" />
+      </geometry>
+      <material name="">
+        <color rgba="0.627450980392157 0.627450980392157 0.627450980392157 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ugv_description/meshes/rasp_rover/left_down_wheel_link.stl" scale="0.875 1.0 0.875" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="left_down_wheel_link_joint" type="continuous">
+    <origin xyz="-0.0475324306493252 0.0380100014305063 0.00674802802973084" rpy="0 0 0" />
+    <parent link="base_link" />
+    <child link="left_down_wheel_link" />
+    <axis xyz="0 -1 0" />
+  </joint>
+
+  <!-- Right Up Wheel -->
+  <link name="right_up_wheel_link">
+    <inertial>
+      <origin xyz="1.85962356624714E-15 -0.0267900015875978 8.99280649946377E-15" rpy="0 0 0" />
+      <mass value="0.210587238755431" />
+      <inertia ixx="0.000115401806837977" ixy="-1.32501719335198E-18" ixz="-4.34981020424034E-35"
+               iyy="0.000168890965481856" iyz="2.371691443642E-21" izz="0.000115401806837977" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ugv_description/meshes/rasp_rover/right_up_wheel_link.stl" scale="0.875 1.0 0.875" />
+      </geometry>
+      <material name="">
+        <color rgba="0.627450980392157 0.627450980392157 0.627450980392157 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ugv_description/meshes/rasp_rover/right_up_wheel_link.stl" scale="0.875 1.0 0.875" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="right_up_wheel_link_joint" type="continuous">
+    <origin xyz="0.0494657123506773 -0.0380100014304871 0.00674802802973084" rpy="0 0 0" />
+    <parent link="base_link" />
+    <child link="right_up_wheel_link" />
+    <axis xyz="0 1 0" />
+  </joint>
+
+  <!-- Right Down Wheel -->
+  <link name="right_down_wheel_link">
+    <inertial>
+      <origin xyz="1.81799020282369E-15 -0.0267900015875967 9.39526234589039E-15" rpy="0 0 0" />
+      <mass value="0.210587238755431" />
+      <inertia ixx="0.000115401806837977" ixy="-1.32501720355927E-18" ixz="1.27637476075258E-32"
+               iyy="0.000168890965481856" iyz="-5.18688069050555E-19" izz="0.000115401806837977" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ugv_description/meshes/rasp_rover/right_down_wheel_link.stl" scale="0.875 1.0 0.875" />
+      </geometry>
+      <material name="">
+        <color rgba="0.627450980392157 0.627450980392157 0.627450980392157 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ugv_description/meshes/rasp_rover/right_down_wheel_link.stl" scale="0.875 1.0 0.875" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="right_down_wheel_link_joint" type="continuous">
+    <origin xyz="-0.0475324306493234 -0.0380100014304901 0.00674802802973144" rpy="0 0 0" />
+    <parent link="base_link" />
+    <child link="right_down_wheel_link" />
+    <axis xyz="0 1 0" />
+  </joint>
+
+  <!-- ==================== Sensors ==================== -->
+
+  <!-- LiDAR (D500) -->
+  <link name="base_lidar_link">
+    <inertial>
+      <origin xyz="0 -8.5259736538555E-19 0.0165546434494574" rpy="0 0 0" />
+      <mass value="0.0418000091653573" />
+      <inertia ixx="8.26853377699878E-06" ixy="2.40188591344428E-23" ixz="-8.79312987446486E-22"
+               iyy="8.26853377699876E-06" iyz="2.55603864237559E-22" izz="8.32524607487378E-06" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ugv_description/meshes/rasp_rover/base_lidar_link.stl" />
+      </geometry>
+      <material name="">
+        <color rgba="0.627450980392157 0.627450980392157 0.627450980392157 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ugv_description/meshes/rasp_rover/base_lidar_link.stl" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="base_lidar_link_joint" type="fixed">
+    <origin xyz="0.0316958390518911 -0.00101477740749894 0.07468" rpy="0 0 0" />
+    <parent link="base_link" />
+    <child link="base_lidar_link" />
+    <axis xyz="0 0 0" />
+  </joint>
+
+  <!-- ============================================================ -->
+  <!--  RoArm-M2 (4DOF Arm) - mounted at former Pan-Tilt position  -->
+  <!--  All links/joints prefixed with "arm_" to avoid conflicts    -->
+  <!-- ============================================================ -->
+
+  <!-- Material for arm links -->
+  <material name="arm_silver">
+    <color rgba="0.700 0.700 0.700 1.000"/>
+  </material>
+
+  <!-- Arm Base Link -->
+  <link name="arm_base_link">
+    <inertial>
+      <origin xyz="0.0032 0 0.04" rpy="0 0 0" />
+      <mass value="0.2562183" />
+      <inertia ixx="0.00029211" ixy="0" ixz="0" iyy="0.00035719" iyz="0" izz="0.000349421" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ugv_roarm_description/meshes/roarm_m2/base_link.stl" scale="1.0 1.0 1.0"/>
+      </geometry>
+      <material name="arm_silver"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ugv_roarm_description/meshes/roarm_m2/base_link.stl" scale="1.0 1.0 1.0"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <!-- Fixed joint: base_link -> arm_base_link (at former Pan-Tilt mount position) -->
+  <joint name="base_link_to_arm_base_link" type="fixed">
+    <origin xyz="-0.02571 -0.0010148 0.07468" rpy="0 0 0" />
+    <parent link="base_link" />
+    <child link="arm_base_link" />
+  </joint>
+
+  <!-- Arm Link 1 (Turntable / Yaw) -->
+  <link name="arm_link1">
+    <inertial>
+      <origin xyz="0 0 -0.015" rpy="0 0 0" />
+      <mass value="0.0729177" />
+      <inertia ixx="4.68465E-05" ixy="0" ixz="0" iyy="3.32107E-05" iyz="0" izz="5.01023E-05" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ugv_roarm_description/meshes/roarm_m2/link1.stl" scale="1.0 1.0 1.0"/>
+      </geometry>
+      <material name="arm_silver"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ugv_roarm_description/meshes/roarm_m2/link1.stl" scale="1.0 1.0 1.0"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="arm_base_link_to_arm_link1" type="revolute">
+    <origin xyz="0.0100000008759151 0 0.123059270461044" rpy="0 0 0" />
+    <parent link="arm_base_link" />
+    <child link="arm_link1" />
+    <axis xyz="0 0 1" />
+    <limit lower="-3.1416" upper="3.1416" effort="10" velocity="1.0" />
+    <dynamics damping="1.5" friction="0.3"/>
+  </joint>
+
+  <!-- Arm Link 2 (Shoulder / Pitch) -->
+  <link name="arm_link2">
+    <inertial>
+      <origin xyz="0.122 0 0" rpy="0 0 0" />
+      <mass value="0.0703216" />
+      <inertia ixx="5.46501E-05" ixy="0" ixz="0" iyy="0.000423091" iyz="0" izz="0.000404557" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ugv_roarm_description/meshes/roarm_m2/link2.stl" scale="1.0 1.0 1.0"/>
+      </geometry>
+      <material name="arm_silver"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ugv_roarm_description/meshes/roarm_m2/link2.stl" scale="1.0 1.0 1.0"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="arm_link1_to_arm_link2" type="revolute">
+    <origin xyz="0 0 0" rpy="-1.5708 -1.5708 0" />
+    <parent link="arm_link1" />
+    <child link="arm_link2" />
+    <axis xyz="0 0 1" />
+    <limit lower="-1.5708" upper="1.5708" effort="10" velocity="1.0" />
+    <dynamics damping="1.5" friction="0.3"/>
+  </joint>
+
+  <!-- Arm Link 3 (Elbow) -->
+  <link name="arm_link3">
+    <inertial>
+      <origin xyz="0.002 -0.13687 0.0059" rpy="0 0 0" />
+      <mass value="0.0269773" />
+      <inertia ixx="0.000199591" ixy="0" ixz="0" iyy="8.01674E-06" iyz="0" izz="0.000196918" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ugv_roarm_description/meshes/roarm_m2/link3.stl" scale="1.0 1.0 1.0"/>
+      </geometry>
+      <material name="arm_silver"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ugv_roarm_description/meshes/roarm_m2/link3.stl" scale="1.0 1.0 1.0"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="arm_link2_to_arm_link3" type="revolute">
+    <origin xyz="0.236815132922094 0.0300023995170449 0" rpy="0 0 1.5708" />
+    <parent link="arm_link2" />
+    <child link="arm_link3" />
+    <axis xyz="0 0 1" />
+    <limit lower="-1" upper="2.95" effort="5" velocity="1.0" />
+    <dynamics damping="1.5" friction="0.3"/>
+  </joint>
+
+  <!-- Arm Gripper Link -->
+  <link name="arm_gripper_link">
+    <inertial>
+      <origin xyz="0.029 0.0027 -0.00078" rpy="0 0 0" />
+      <mass value="0.0028708" />
+      <inertia ixx="5.23216E-07" ixy="0" ixz="0" iyy="1.82071E-06" iyz="0" izz="1.60231E-06" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ugv_roarm_description/meshes/roarm_m2/gripper_link.stl" scale="1.0 1.0 1.0"/>
+      </geometry>
+      <material name="arm_silver"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ugv_roarm_description/meshes/roarm_m2/gripper_link.stl" scale="1.0 1.0 1.0"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="arm_link3_to_arm_gripper_link" type="revolute">
+    <origin xyz="0.002906 -0.21599 -0.00066683" rpy="-1.5708 0 -1.5708" />
+    <parent link="arm_link3" />
+    <child link="arm_gripper_link" />
+    <axis xyz="0 0 1" />
+    <limit lower="0" upper="1.5" effort="2" velocity="1.0" />
+    <dynamics damping="1.5" friction="0.3"/>
+  </joint>
+
+  <!-- Arm Hand TCP (End Effector) -->
+  <link name="arm_hand_tcp"></link>
+  <joint name="arm_link3_to_arm_hand_tcp" type="fixed">
+    <origin xyz="0.002 -0.2802 0" rpy="1.5708 0 -1.5708" />
+    <parent link="arm_link3" />
+    <child link="arm_hand_tcp" />
+    <axis xyz="0 0 0" />
+  </joint>
+
+  <!-- ============================================================ -->
+  <!--  ros2_control hardware interface (gazebo_ros2_control)       -->
+  <!-- ============================================================ -->
+  <xacro:include filename="$(find ugv_roarm_description)/config/ugv_arm_ros2_control.xacro" />
+
+  <!-- ============================================================ -->
+  <!--  RoArm-M2 Gazebo Properties                                  -->
+  <!-- ============================================================ -->
+
+  <xacro:property name="arm_body_color" value="Gazebo/Silver" />
+
+  <gazebo reference="arm_base_link">
+    <material>${arm_body_color}</material>
+    <mu1>0.2</mu1>
+    <mu2>0.2</mu2>
+    <self_collide>true</self_collide>
+    <gravity>true</gravity>
+  </gazebo>
+
+  <gazebo reference="arm_link1">
+    <material>${arm_body_color}</material>
+    <mu1>0.2</mu1>
+    <mu2>0.2</mu2>
+    <self_collide>true</self_collide>
+  </gazebo>
+
+  <gazebo reference="arm_link2">
+    <material>${arm_body_color}</material>
+    <mu1>0.2</mu1>
+    <mu2>0.2</mu2>
+    <self_collide>true</self_collide>
+  </gazebo>
+
+  <gazebo reference="arm_link3">
+    <material>${arm_body_color}</material>
+    <mu1>0.2</mu1>
+    <mu2>0.2</mu2>
+    <self_collide>true</self_collide>
+  </gazebo>
+
+  <gazebo reference="arm_gripper_link">
+    <material>${arm_body_color}</material>
+    <mu1>0.2</mu1>
+    <mu2>0.2</mu2>
+    <self_collide>true</self_collide>
+  </gazebo>
+
+</robot>

@@ -74,6 +74,7 @@ class OdomPublisher : public rclcpp::Node
     float vx;  // Linear velocity
     float vw;  // Angular velocity
     bool pub_odom_tf_ = false;
+    double wheel_separation_ = 0.175;
     bool is_initialized = false;
     rclcpp::Time last_time_;
     std::string odom_frame = "odom";
@@ -89,10 +90,12 @@ public:
         this->declare_parameter<std::string>("odom_frame", "odom");
         this->declare_parameter<std::string>("base_footprint_frame", "base_footprint");
         this->declare_parameter<bool>("pub_odom_tf", false);
+        this->declare_parameter<double>("wheel_separation", 0.175);
 
         this->get_parameter<bool>("pub_odom_tf", pub_odom_tf_);
         this->get_parameter<std::string>("odom_frame", odom_frame);
         this->get_parameter<std::string>("base_footprint_frame", base_footprint_frame);
+        this->get_parameter<double>("wheel_separation", wheel_separation_);
 
         // Initialize transform broadcaster
         tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
@@ -157,7 +160,7 @@ private:
 
         // Calculate average distance and change in heading
         float dxy_ave = (dright + dleft) / 2.0;
-        float dth = (dright - dleft) / 0.175;
+        float dth = (dright - dleft) / wheel_separation_;
 
         // Compute linear and angular velocities
         vx = dxy_ave / dt;
