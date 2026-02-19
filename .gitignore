@@ -3,3 +3,4 @@ install/
 log/
 src/gazebo_ros2_control/
 src/ugv_main/ugv_roarm_description/
+src/waver_gazebo/
