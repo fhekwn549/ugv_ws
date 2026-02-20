@@ -28,6 +28,7 @@ setup(
             'ugv_bringup = ugv_bringup.ugv_bringup:main',
             'ugv_driver = ugv_bringup.ugv_driver:main',
             'roarm_driver = ugv_bringup.roarm_driver:main',
+            'rosbridge_relay = ugv_bringup.rosbridge_relay:main',
         ],
     },
 )
