@@ -89,6 +89,9 @@ class RoarmDriver(Node):
         period = 1.0 / feedback_rate
         self.feedback_timer = self.create_timer(period, self.feedback_callback)
 
+        # Track last gripper ESP32 value (to include in T:102 commands)
+        self.last_gripper_esp32 = None
+
         # Enable torque
         self._serial_write({'T': 210, 'cmd': 1})
 
@@ -134,11 +137,16 @@ class RoarmDriver(Node):
                 esp32_angle = urdf_to_esp32(name, urdf_angle)
                 cmd[JOINT_MAP[name]] = round(esp32_angle, 4)
 
+        # Always include gripper to prevent torque release
+        if 'hand' not in cmd and self.last_gripper_esp32 is not None:
+            cmd['hand'] = self.last_gripper_esp32
+
         self._serial_write(cmd)
 
     def gripper_callback(self, msg: Float64):
         esp32_val = urdf_to_esp32('arm_link3_to_arm_gripper_link', msg.data)
-        cmd = {'T': 106, 'cmd': round(esp32_val, 4), 'spd': 0, 'acc': 0}
+        self.last_gripper_esp32 = round(esp32_val, 4)
+        cmd = {'T': 106, 'cmd': self.last_gripper_esp32, 'spd': 0, 'acc': 0}
         self._serial_write(cmd)
 
     def feedback_callback(self):
