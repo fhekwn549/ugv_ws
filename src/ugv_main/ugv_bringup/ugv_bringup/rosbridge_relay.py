@@ -26,10 +26,11 @@ from rclpy.node import Node
 
 from sensor_msgs.msg import JointState, LaserScan, Imu
 from nav_msgs.msg import Odometry
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import Twist, TransformStamped
 from std_msgs.msg import Float32, Float64
 from trajectory_msgs.msg import JointTrajectory
 from builtin_interfaces.msg import Time
+from tf2_ros import TransformBroadcaster
 
 import roslibpy
 
@@ -51,8 +52,15 @@ class RosbridgeRelay(Node):
 
         self.declare_parameter('host', '192.168.0.71')
         self.declare_parameter('port', 9090)
+        self.declare_parameter('pub_odom_tf', False)
         host = self.get_parameter('host').value
         port = self.get_parameter('port').value
+        self._pub_odom_tf = self.get_parameter('pub_odom_tf').value
+
+        # TF broadcaster for odom → base_footprint (used in SLAM mode)
+        if self._pub_odom_tf:
+            self._tf_broadcaster = TransformBroadcaster(self)
+            self.get_logger().info('odom → base_footprint TF publishing enabled')
 
         # --- RPi → WSL publishers ---
         self.pub_joint = self.create_publisher(JointState, '/joint_states', 10)
@@ -180,6 +188,17 @@ class RosbridgeRelay(Node):
         m.twist.twist.angular.y = float(ang.get('y', 0.0))
         m.twist.twist.angular.z = float(ang.get('z', 0.0))
         self.pub_odom.publish(m)
+
+        # Broadcast odom → base_footprint TF from odometry data
+        if self._pub_odom_tf:
+            t = TransformStamped()
+            t.header = m.header
+            t.child_frame_id = m.child_frame_id or 'base_footprint'
+            t.transform.translation.x = m.pose.pose.position.x
+            t.transform.translation.y = m.pose.pose.position.y
+            t.transform.translation.z = m.pose.pose.position.z
+            t.transform.rotation = m.pose.pose.orientation
+            self._tf_broadcaster.sendTransform(t)
 
     def _relay_imu(self, msg):
         m = Imu()
