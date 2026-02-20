@@ -4,6 +4,7 @@ from rclpy.node import Node
 from trajectory_msgs.msg import JointTrajectory
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Float64
+import math
 import serial
 import json
 import threading
@@ -23,6 +24,25 @@ FEEDBACK_MAP = {
     'e': 'arm_link2_to_arm_link3',
     't': 'arm_link3_to_arm_gripper_link',
 }
+
+# ESP32 → URDF joint angle transforms: URDF = scale * ESP32 + offset
+# Gripper scaling is handled by teleop_all.py before publishing to /roarm/gripper_cmd
+ARM_JOINT_TRANSFORMS = {
+    'arm_base_link_to_arm_link1': (1.0, 0.0),
+    'arm_link1_to_arm_link2': (1.0, 0.0),
+    'arm_link2_to_arm_link3': (1.0, 0.0),
+    'arm_link3_to_arm_gripper_link': (1.0, 0.0),
+}
+
+
+def esp32_to_urdf(joint_name, esp32_val):
+    scale, offset = ARM_JOINT_TRANSFORMS.get(joint_name, (1.0, 0.0))
+    return scale * esp32_val + offset
+
+
+def urdf_to_esp32(joint_name, urdf_val):
+    scale, offset = ARM_JOINT_TRANSFORMS.get(joint_name, (1.0, 0.0))
+    return (urdf_val - offset) / scale
 
 
 class RoarmDriver(Node):
@@ -110,12 +130,15 @@ class RoarmDriver(Node):
 
         for i, name in enumerate(msg.joint_names):
             if name in JOINT_MAP and i < len(point.positions):
-                cmd[JOINT_MAP[name]] = round(point.positions[i], 4)
+                urdf_angle = point.positions[i]
+                esp32_angle = urdf_to_esp32(name, urdf_angle)
+                cmd[JOINT_MAP[name]] = round(esp32_angle, 4)
 
         self._serial_write(cmd)
 
     def gripper_callback(self, msg: Float64):
-        cmd = {'T': 106, 'cmd': round(msg.data, 4), 'spd': 0, 'acc': 0}
+        esp32_val = urdf_to_esp32('arm_link3_to_arm_gripper_link', msg.data)
+        cmd = {'T': 106, 'cmd': round(esp32_val, 4), 'spd': 0, 'acc': 0}
         self._serial_write(cmd)
 
     def feedback_callback(self):
@@ -128,8 +151,10 @@ class RoarmDriver(Node):
 
         for field, joint_name in FEEDBACK_MAP.items():
             if field in resp:
+                esp32_angle = float(resp[field])
+                urdf_angle = esp32_to_urdf(joint_name, esp32_angle)
                 js.name.append(joint_name)
-                js.position.append(float(resp[field]))
+                js.position.append(urdf_angle)
 
         if js.name:
             self.joint_state_pub.publish(js)
