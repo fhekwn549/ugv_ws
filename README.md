@@ -12,7 +12,7 @@
 
 | 리포 | 역할 | 내용 |
 |------|------|------|
-| **이 리포 (`ugv_ws`)** | 하드웨어 구동 | 시리얼 드라이버, 센서 처리, 오도메트리 |
+| **이 리포 (`ugv_ws`)** | 하드웨어 구동 | 시리얼 드라이버, 센서 처리, 오도메트리, rosbridge 중계 |
 | [ugv_roarm_description](https://github.com/fhekwn549/ugv_roarm_description) | 로봇 정의 + 실행 구성 | URDF, launch, Gazebo 시뮬레이션, 텔레옵 |
 
 RPi에서는 두 리포 모두 필요합니다. `ugv_roarm_description`의 `rasp_bringup.launch.py`가 이 리포의 드라이버 노드들을 실행합니다.
@@ -25,6 +25,73 @@ RPi에서는 두 리포 모두 필요합니다. `ugv_roarm_description`의 `rasp
 | `/dev/ttyUSB0` | RoArm-M2 ESP32 | `roarm_driver` |
 | `/dev/ttyUSB1` | LDLidar (STL-19P) | `ldlidar_ros2` |
 
+---
+
+## Quick Start: 처음부터 실행까지
+
+> **전제 조건**: RPi에 Ubuntu 22.04 Server (arm64) + ROS 2 Humble 설치 완료, WSL2에 Ubuntu 22.04 + ROS 2 Humble 설치 완료
+
+**실행 순서와 상세 가이드는 [ugv_roarm_description README](https://github.com/fhekwn549/ugv_roarm_description#quick-start-실제-로봇-제어-wsl--rpi)를 참조하세요.**
+
+### RPi 초기 세팅 요약
+
+```bash
+ssh pi@192.168.0.71
+
+# 클론
+cd ~ && git clone -b ros2-humble-develop https://github.com/fhekwn549/ugv_ws.git
+cd ~/ugv_ws/src/ugv_main && git clone https://github.com/fhekwn549/ugv_roarm_description.git
+
+# 의존성
+pip3 install pyserial
+sudo apt install ros-humble-rosbridge-server ros-humble-xacro \
+  ros-humble-robot-state-publisher ros-humble-joint-state-publisher
+
+# 빌드
+cd ~/ugv_ws && source /opt/ros/humble/setup.bash
+colcon build --packages-select ugv_bringup ugv_roarm_description ugv_description \
+  ugv_base_node ugv_interface ldlidar
+source install/setup.bash
+```
+
+### WSL 초기 세팅 요약
+
+```bash
+# 클론
+cd ~ && git clone -b ros2-humble-develop https://github.com/fhekwn549/ugv_ws.git
+cd ~/ugv_ws/src/ugv_main && git clone https://github.com/fhekwn549/ugv_roarm_description.git
+
+# 의존성
+pip3 install roslibpy
+sudo apt install ros-humble-xacro ros-humble-robot-state-publisher \
+  ros-humble-joint-state-publisher ros-humble-joint-state-publisher-gui \
+  ros-humble-rviz2 ros-humble-tf2-ros
+
+# 빌드
+cd ~/ugv_ws && source /opt/ros/humble/setup.bash
+colcon build --packages-select ugv_bringup ugv_roarm_description ugv_description
+source install/setup.bash
+```
+
+### 매번 실행 (터미널 3개)
+
+```bash
+# [터미널 1: RPi SSH] 하드웨어 드라이버 + rosbridge
+ssh pi@192.168.0.71
+source ~/ugv_ws/install/setup.bash
+ros2 launch ugv_roarm_description rasp_bringup.launch.py
+
+# [터미널 2: WSL] RViz + rosbridge 중계
+source ~/ugv_ws/install/setup.bash
+ros2 launch ugv_roarm_description remote_view.launch.py host:=192.168.0.71
+
+# [터미널 3: WSL] 키보드 텔레옵
+source ~/ugv_ws/install/setup.bash
+ros2 run ugv_roarm_description teleop_all.py --ros-args -p mode:=rviz -p model:=rasp_rover
+```
+
+---
+
 ## Changes from upstream
 
 ### Added: `roarm_driver` (in `ugv_bringup`)
@@ -35,27 +102,36 @@ RoArm-M2 로봇팔을 시리얼(`/dev/ttyUSB0`)로 제어하는 ROS 2 드라이�
 - **Subscribe**: `/roarm/gripper_cmd` (Float64) → T:106 그리퍼 명령
 - **Publish**: `/joint_states` (JointState) ← T:105 주기적 조회 (5Hz)
 - **Parameters**: `serial_port` (default: `/dev/ttyUSB0`), `baud_rate` (115200), `feedback_rate` (5.0)
+- 팔 관절 이동 시 그리퍼 토크 유지 (T:102에 항상 `hand` 값 포함)
+
+### Added: `rosbridge_relay` (in `ugv_bringup`)
+
+WSL ↔ RPi ROS 2 토픽 브릿지 (rosbridge WebSocket 기반).
+
+- **RPi → WSL**: `/joint_states`, `/scan`, `/odom`, `/imu/data_raw`, `/voltage`
+- **WSL → RPi**: `/cmd_vel`, `/arm_controller/joint_trajectory`, `/roarm/gripper_cmd`
+- URDF ↔ ESP32 변환 없이 값을 그대로 전달 (변환은 `roarm_driver`가 담당)
 
 ### Modified: `base_node` / `base_node_ekf`
 
 - `wheel_separation` 파라미터 추가 (기존 하드코딩 0.175 → 파라미터화)
 
-## 배포 (WSL → RPi)
+## 배포 (코드 수정 후)
 
 ```bash
 # WSL: push
 cd ~/ugv_ws
-git push origin ros2-humble-develop
+git add -A && git commit -m "설명" && git push origin ros2-humble-develop
 
-# RPi: pull & build
-cd ~/ugv_ws
-git pull origin ros2-humble-develop
-cd src/ugv_main/ugv_roarm_description
-git pull origin main
+cd ~/ugv_ws/src/ugv_main/ugv_roarm_description
+git add -A && git commit -m "설명" && git push origin main
+
+# RPi: pull & build (SSH)
+cd ~/ugv_ws && git pull origin ros2-humble-develop
+cd src/ugv_main/ugv_roarm_description && git pull origin main
 cd ~/ugv_ws
 colcon build --packages-select ugv_bringup ugv_roarm_description
 source install/setup.bash
-ros2 launch ugv_roarm_description rasp_bringup.launch.py
 ```
 
 ---
