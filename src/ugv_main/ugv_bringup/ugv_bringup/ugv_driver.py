@@ -40,7 +40,8 @@ class UgvDriver(Node):
 
     # Callback for processing velocity commands
     def cmd_vel_callback(self, msg):
-        linear_velocity = msg.linear.x
+        # Negate linear.x: ESP32 motor direction is opposite to URDF convention
+        linear_velocity = -msg.linear.x
         angular_velocity = msg.angular.z
 
         # Apply minimum threshold to angular velocity if linear velocity is zero
