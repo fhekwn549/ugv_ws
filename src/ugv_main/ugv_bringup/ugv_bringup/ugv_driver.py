@@ -26,6 +26,10 @@ class UgvDriver(Node):
     def __init__(self, name):
         super().__init__(name)
 
+        # Angular velocity scale: compensate for skid-steer ground friction
+        self.declare_parameter('angular_scale', 2.5)
+        self.angular_scale = self.get_parameter('angular_scale').value
+
         # Subscribe to velocity commands (cmd_vel topic)
         self.cmd_vel_sub_ = self.create_subscription(Twist, "cmd_vel", self.cmd_vel_callback, 10)
 
@@ -42,7 +46,8 @@ class UgvDriver(Node):
     def cmd_vel_callback(self, msg):
         # Negate linear.x: ESP32 motor direction is opposite to URDF convention
         linear_velocity = -msg.linear.x
-        angular_velocity = msg.angular.z
+        # Scale up angular to compensate for skid-steer ground friction
+        angular_velocity = msg.angular.z * self.angular_scale
 
         # Apply minimum threshold to angular velocity if linear velocity is zero
         if linear_velocity == 0:
