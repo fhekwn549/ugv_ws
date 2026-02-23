@@ -257,8 +257,11 @@ class RosbridgeRelay(Node):
         self._rpi_gripper.publish(roslibpy.Message({'data': msg.data}))
 
     def destroy_node(self):
-        if self.client.is_connected:
-            self.client.terminate()
+        try:
+            if self.client.is_connected:
+                self.client.terminate()
+        except Exception:
+            pass
         super().destroy_node()
 
 
