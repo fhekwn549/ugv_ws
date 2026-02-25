@@ -86,6 +86,7 @@ class OdomPublisher : public rclcpp::Node
     // cmd_vel dead reckoning (for robots without encoders)
     bool use_cmd_vel_odom_ = false;
     bool use_imu_yaw_ = true;
+    double yaw_scale_ = 1.0;
     float cmd_linear_x_ = 0.0;
     float cmd_angular_z_ = 0.0;
     rclcpp::Time last_integration_time_;
@@ -103,6 +104,7 @@ public:
         this->declare_parameter<double>("wheel_separation", 0.175);
         this->declare_parameter<bool>("use_cmd_vel_odom", false);
         this->declare_parameter<bool>("use_imu_yaw", true);
+        this->declare_parameter<double>("yaw_scale", 1.0);
 
         this->get_parameter<bool>("pub_odom_tf", pub_odom_tf_);
         this->get_parameter<std::string>("odom_frame", odom_frame);
@@ -110,6 +112,7 @@ public:
         this->get_parameter<double>("wheel_separation", wheel_separation_);
         this->get_parameter<bool>("use_cmd_vel_odom", use_cmd_vel_odom_);
         this->get_parameter<bool>("use_imu_yaw", use_imu_yaw_);
+        this->get_parameter<double>("yaw_scale", yaw_scale_);
 
         // Initialize transform broadcaster
         tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
@@ -241,7 +244,7 @@ private:
                     // Integrate yaw from angular.z when IMU is not available
                     if (!imu_received_)
                     {
-                        yaw += cmd_angular_z_ * dt;
+                        yaw += cmd_angular_z_ * yaw_scale_ * dt;
                         // Normalize yaw to [-pi, pi]
                         while (yaw > M_PI) yaw -= 2.0 * M_PI;
                         while (yaw < -M_PI) yaw += 2.0 * M_PI;
