@@ -171,6 +171,13 @@ class RoarmDriver(Node):
                 js.name.append(joint_name)
                 js.position.append(urdf_angle)
 
+        # Wheel joints (no encoders, publish 0.0 so robot_state_publisher
+        # has a complete TF tree)
+        for wheel in ('left_up_wheel_link_joint', 'left_down_wheel_link_joint',
+                      'right_up_wheel_link_joint', 'right_down_wheel_link_joint'):
+            js.name.append(wheel)
+            js.position.append(0.0)
+
         if js.name:
             self.joint_state_pub.publish(js)
 
