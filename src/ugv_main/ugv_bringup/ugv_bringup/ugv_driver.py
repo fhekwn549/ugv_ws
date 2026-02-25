@@ -30,6 +30,12 @@ class UgvDriver(Node):
         self.declare_parameter('angular_scale', 2.5)
         self.angular_scale = self.get_parameter('angular_scale').value
 
+        # Steering bias: compensate for left/right wheel resistance imbalance
+        # Applied as angular offset proportional to linear velocity
+        # Tune sign and magnitude until the robot drives straight
+        self.declare_parameter('steering_bias', 0.0)
+        self.steering_bias = self.get_parameter('steering_bias').value
+
         # Subscribe to velocity commands (cmd_vel topic)
         self.cmd_vel_sub_ = self.create_subscription(Twist, "cmd_vel", self.cmd_vel_callback, 10)
 
@@ -48,6 +54,8 @@ class UgvDriver(Node):
         linear_velocity = -msg.linear.x
         # Scale up angular to compensate for skid-steer ground friction
         angular_velocity = msg.angular.z * self.angular_scale
+        # Compensate for left/right wheel resistance imbalance
+        angular_velocity += self.steering_bias * linear_velocity
 
         # Apply minimum threshold to angular velocity if linear velocity is zero
         if linear_velocity == 0:
