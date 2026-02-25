@@ -151,9 +151,10 @@ private:
     }
 
     // Callback to store latest cmd_vel for dead reckoning
+    // Negate linear.x to match ugv_driver convention (ESP32 direction is inverted)
     void handle_cmd_vel(const geometry_msgs::msg::Twist::SharedPtr msg)
     {
-        cmd_linear_x_ = msg->linear.x;
+        cmd_linear_x_ = -msg->linear.x;
     }
 
     // Callback to handle raw odometry data and update position/velocity

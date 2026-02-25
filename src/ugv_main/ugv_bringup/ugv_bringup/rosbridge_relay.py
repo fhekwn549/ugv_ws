@@ -70,6 +70,11 @@ class RosbridgeRelay(Node):
         self.pub_voltage = self.create_publisher(Float32, '/voltage', 10)
 
         # --- WSL → RPi (subscribe locally, forward to RPi) ---
+        # roslibpy topics (initialized in _on_connected)
+        self._rpi_cmd_vel = None
+        self._rpi_arm_traj = None
+        self._rpi_gripper = None
+
         self.sub_cmd_vel = self.create_subscription(
             Twist, '/cmd_vel', self._cmd_vel_cb, 10)
         self.sub_arm_traj = self.create_subscription(
@@ -225,7 +230,7 @@ class RosbridgeRelay(Node):
 
     # --- WSL → RPi callbacks ---
     def _cmd_vel_cb(self, msg):
-        if not self.client.is_connected:
+        if not self.client.is_connected or self._rpi_cmd_vel is None:
             return
         self._rpi_cmd_vel.publish(roslibpy.Message({
             'linear': {'x': msg.linear.x, 'y': msg.linear.y, 'z': msg.linear.z},
@@ -234,7 +239,7 @@ class RosbridgeRelay(Node):
 
     def _arm_traj_cb(self, msg):
         """Forward arm trajectory WSL → RPi (pass-through, roarm_driver converts)."""
-        if not self.client.is_connected:
+        if not self.client.is_connected or self._rpi_arm_traj is None:
             return
         points = []
         for pt in msg.points:
@@ -252,7 +257,7 @@ class RosbridgeRelay(Node):
 
     def _gripper_cb(self, msg):
         """Forward gripper command WSL → RPi (pass-through, roarm_driver converts)."""
-        if not self.client.is_connected:
+        if not self.client.is_connected or self._rpi_gripper is None:
             return
         self._rpi_gripper.publish(roslibpy.Message({'data': msg.data}))
 
