@@ -62,6 +62,7 @@ class OdomPublisher : public rclcpp::Node
 {
     rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_subscription_;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr odom_raw_subscription_;
+    rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_subscription_;
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_publisher_;
     std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
     rclcpp::TimerBase::SharedPtr timer_; // Timer to control publishing rate
@@ -71,8 +72,8 @@ class OdomPublisher : public rclcpp::Node
     double y_pos_ = 0.0;
     float pre_odl;
     float pre_odr;
-    float vx;  // Linear velocity
-    float vw;  // Angular velocity
+    float vx = 0.0;  // Linear velocity
+    float vw = 0.0;  // Angular velocity
     bool pub_odom_tf_ = false;
     double wheel_separation_ = 0.175;
     bool is_initialized = false;
@@ -81,6 +82,12 @@ class OdomPublisher : public rclcpp::Node
     std::string base_footprint_frame = "base_footprint";
     float init_odl = 0.0; // Initial value for left wheel encoder
     float init_odr = 0.0; // Initial value for right wheel encoder
+
+    // cmd_vel dead reckoning (for robots without encoders)
+    bool use_cmd_vel_odom_ = false;
+    float cmd_linear_x_ = 0.0;
+    rclcpp::Time last_integration_time_;
+    bool integration_initialized_ = false;
 
 public:
     OdomPublisher()
@@ -91,18 +98,34 @@ public:
         this->declare_parameter<std::string>("base_footprint_frame", "base_footprint");
         this->declare_parameter<bool>("pub_odom_tf", false);
         this->declare_parameter<double>("wheel_separation", 0.175);
+        this->declare_parameter<bool>("use_cmd_vel_odom", false);
 
         this->get_parameter<bool>("pub_odom_tf", pub_odom_tf_);
         this->get_parameter<std::string>("odom_frame", odom_frame);
         this->get_parameter<std::string>("base_footprint_frame", base_footprint_frame);
         this->get_parameter<double>("wheel_separation", wheel_separation_);
+        this->get_parameter<bool>("use_cmd_vel_odom", use_cmd_vel_odom_);
 
         // Initialize transform broadcaster
         tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
 
-        // Subscribe to IMU and raw odometry data topics
+        // Subscribe to IMU data
         imu_subscription_ = this->create_subscription<sensor_msgs::msg::Imu>("imu/data", 5, std::bind(&OdomPublisher::handle_imu, this, _1));
-        odom_raw_subscription_ = this->create_subscription<std_msgs::msg::Float32MultiArray>("odom/odom_raw", 50, std::bind(&OdomPublisher::handle_odom, this, _1));
+
+        if (use_cmd_vel_odom_)
+        {
+            // Dead reckoning from cmd_vel (no encoders)
+            cmd_vel_subscription_ = this->create_subscription<geometry_msgs::msg::Twist>(
+                "cmd_vel", 10, std::bind(&OdomPublisher::handle_cmd_vel, this, _1));
+            RCLCPP_INFO(this->get_logger(), "Using cmd_vel dead reckoning for odometry (no encoders)");
+        }
+        else
+        {
+            // Encoder-based odometry
+            odom_raw_subscription_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
+                "odom/odom_raw", 50, std::bind(&OdomPublisher::handle_odom, this, _1));
+            RCLCPP_INFO(this->get_logger(), "Using encoder-based odometry");
+        }
 
         // Publisher for odometry messages
         odom_publisher_ = this->create_publisher<nav_msgs::msg::Odometry>("odom", 5);
@@ -124,6 +147,13 @@ private:
         double siny_cosp = 2 * (q0 * q3 + q1 * q2);
         double cosy_cosp = 1 - 2 * (q2 * q2 + q3 * q3);
         imu_yaw = std::atan2(siny_cosp, cosy_cosp);
+        yaw = imu_yaw;
+    }
+
+    // Callback to store latest cmd_vel for dead reckoning
+    void handle_cmd_vel(const geometry_msgs::msg::Twist::SharedPtr msg)
+    {
+        cmd_linear_x_ = msg->linear.x;
     }
 
     // Callback to handle raw odometry data and update position/velocity
@@ -188,6 +218,28 @@ private:
     // Function to publish odometry data and broadcast transformation
     void publish_odom()
     {
+        // cmd_vel dead reckoning: integrate commanded velocity each cycle
+        if (use_cmd_vel_odom_)
+        {
+            rclcpp::Time now = rclcpp::Clock().now();
+            if (integration_initialized_)
+            {
+                double dt = (now - last_integration_time_).seconds();
+                if (dt > 0.0 && dt < 1.0)
+                {
+                    float dx = cmd_linear_x_ * dt;
+                    x_pos_ += cos(yaw) * dx;
+                    y_pos_ += sin(yaw) * dx;
+                    vx = cmd_linear_x_;
+                }
+            }
+            else
+            {
+                integration_initialized_ = true;
+            }
+            last_integration_time_ = now;
+        }
+
         auto odom = nav_msgs::msg::Odometry();
         auto trans = geometry_msgs::msg::TransformStamped();
 
