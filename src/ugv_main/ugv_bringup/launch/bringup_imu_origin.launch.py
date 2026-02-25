@@ -73,7 +73,6 @@ def generate_launch_description():
     driver_node = Node(
         package='ugv_bringup',
         executable='ugv_driver',
-        parameters=[{'steering_bias': 0.1}],
     )
     # Define the base node with parameters
     base_node = Node(
