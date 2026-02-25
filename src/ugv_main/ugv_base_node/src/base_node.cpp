@@ -86,8 +86,10 @@ class OdomPublisher : public rclcpp::Node
     // cmd_vel dead reckoning (for robots without encoders)
     bool use_cmd_vel_odom_ = false;
     float cmd_linear_x_ = 0.0;
+    float cmd_angular_z_ = 0.0;
     rclcpp::Time last_integration_time_;
     bool integration_initialized_ = false;
+    bool imu_received_ = false;
 
 public:
     OdomPublisher()
@@ -143,6 +145,8 @@ private:
         q3 = msg->orientation.z;
         q0 = msg->orientation.w;
 
+        imu_received_ = true;
+
         // Calculate yaw angle from quaternion
         double siny_cosp = 2 * (q0 * q3 + q1 * q2);
         double cosy_cosp = 1 - 2 * (q2 * q2 + q3 * q3);
@@ -155,6 +159,7 @@ private:
     void handle_cmd_vel(const geometry_msgs::msg::Twist::SharedPtr msg)
     {
         cmd_linear_x_ = -msg->linear.x;
+        cmd_angular_z_ = -msg->angular.z;
     }
 
     // Callback to handle raw odometry data and update position/velocity
@@ -212,8 +217,8 @@ private:
             odom_yaw += dth;
         }
 
-        // Use IMU yaw if available
-        yaw = imu_yaw != 0 ? imu_yaw : odom_yaw;
+        // Use IMU yaw if available, otherwise use encoder-derived yaw
+        yaw = imu_received_ ? imu_yaw : odom_yaw;
     }
 
     // Function to publish odometry data and broadcast transformation
@@ -228,10 +233,20 @@ private:
                 double dt = (now - last_integration_time_).seconds();
                 if (dt > 0.0 && dt < 1.0)
                 {
+                    // Integrate yaw from angular.z when IMU is not available
+                    if (!imu_received_)
+                    {
+                        yaw += cmd_angular_z_ * dt;
+                        // Normalize yaw to [-pi, pi]
+                        while (yaw > M_PI) yaw -= 2.0 * M_PI;
+                        while (yaw < -M_PI) yaw += 2.0 * M_PI;
+                    }
+
                     float dx = cmd_linear_x_ * dt;
                     x_pos_ += cos(yaw) * dx;
                     y_pos_ += sin(yaw) * dx;
                     vx = cmd_linear_x_;
+                    vw = cmd_angular_z_;
                 }
             }
             else
@@ -244,6 +259,17 @@ private:
         auto odom = nav_msgs::msg::Odometry();
         auto trans = geometry_msgs::msg::TransformStamped();
 
+        // Compute orientation quaternion from yaw when IMU is not providing it
+        double odom_q0 = q0, odom_q1 = q1, odom_q2 = q2, odom_q3 = q3;
+        if (use_cmd_vel_odom_ && !imu_received_)
+        {
+            // yaw-only quaternion: (0, 0, sin(yaw/2), cos(yaw/2))
+            odom_q0 = cos(yaw / 2.0);
+            odom_q1 = 0.0;
+            odom_q2 = 0.0;
+            odom_q3 = sin(yaw / 2.0);
+        }
+
         // Set the header information
         odom.header.stamp = rclcpp::Clock().now();
         odom.header.frame_id = odom_frame;
@@ -252,10 +278,10 @@ private:
         // Set the position and orientation in the odometry message
         odom.pose.pose.position.x = x_pos_;
         odom.pose.pose.position.y = y_pos_;
-        odom.pose.pose.orientation.x = q1;
-        odom.pose.pose.orientation.y = q2;
-        odom.pose.pose.orientation.z = q3;
-        odom.pose.pose.orientation.w = q0;
+        odom.pose.pose.orientation.x = odom_q1;
+        odom.pose.pose.orientation.y = odom_q2;
+        odom.pose.pose.orientation.z = odom_q3;
+        odom.pose.pose.orientation.w = odom_q0;
 
         // Choose covariance matrix based on the robot's state
         if (vx == 0 && vw == 0)
@@ -286,10 +312,10 @@ private:
             // Set translation and rotation for the transform
             trans.transform.translation.x = x_pos_;
             trans.transform.translation.y = y_pos_;
-            trans.transform.rotation.x = q1;
-            trans.transform.rotation.y = q2;
-            trans.transform.rotation.z = q3;
-            trans.transform.rotation.w = q0;
+            trans.transform.rotation.x = odom_q1;
+            trans.transform.rotation.y = odom_q2;
+            trans.transform.rotation.z = odom_q3;
+            trans.transform.rotation.w = odom_q0;
 
             // Broadcast the transformation
             tf_broadcaster_->sendTransform(trans);

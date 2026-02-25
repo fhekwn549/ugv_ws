@@ -123,9 +123,14 @@ class ugv_bringup(Node):
     def feedback_loop(self):
         self.base_controller.feedback_data()
         if self.base_controller.base_data.get("T") == 1001:
-            self.publish_imu()
-            self.publish_odom_raw()
-            self.publish_voltage()
+            try:
+                self.publish_imu()
+                self.publish_odom_raw()
+                self.publish_voltage()
+            except (KeyError, ValueError, TypeError) as e:
+                self.get_logger().warn(
+                    f'Skipping corrupted feedback frame: {e}',
+                    throttle_duration_sec=5.0)
 
     def publish_imu(self):
         """Publish IMU orientation from ESP32 r/p/y (degrees) as quaternion."""
