@@ -12,7 +12,7 @@
 
 | 리포 | 역할 | 내용 |
 |------|------|------|
-| **이 리포 (`ugv_ws`)** | 하드웨어 구동 | 시리얼 드라이버, 센서 처리, 오도메트리, rosbridge 중계 |
+| **이 리포 (`ugv_ws`)** | 하드웨어 구동 | 시리얼 드라이버, 센서 처리 |
 | [ugv_roarm_description](https://github.com/fhekwn549/ugv_roarm_description) | 로봇 정의 + 실행 구성 | URDF, launch, Gazebo 시뮬레이션, 텔레옵 |
 
 RPi에서는 두 리포 모두 필요합니다. `ugv_roarm_description`의 `rasp_bringup.launch.py`가 이 리포의 드라이버 노드들을 실행합니다.
@@ -44,13 +44,18 @@ cd ~/ugv_ws/src/ugv_main && git clone https://github.com/fhekwn549/ugv_roarm_des
 
 # 의존성
 pip3 install pyserial
-sudo apt install ros-humble-rosbridge-server ros-humble-xacro \
+sudo apt install ros-humble-rmw-cyclonedds-cpp ros-humble-xacro \
   ros-humble-robot-state-publisher ros-humble-joint-state-publisher
+
+# 스왑 추가 (RPi RAM 1GB인 경우, rf2o C++ 빌드 OOM 방지)
+sudo fallocate -l 2G /swapfile
+sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 
 # 빌드
 cd ~/ugv_ws && source /opt/ros/humble/setup.bash
 colcon build --packages-select ugv_bringup ugv_roarm_description ugv_description \
-  ugv_base_node ugv_interface ldlidar
+  rf2o_laser_odometry ugv_interface ldlidar
 source install/setup.bash
 ```
 
@@ -62,10 +67,9 @@ cd ~ && git clone -b ros2-humble-develop https://github.com/fhekwn549/ugv_ws.git
 cd ~/ugv_ws/src/ugv_main && git clone https://github.com/fhekwn549/ugv_roarm_description.git
 
 # 의존성
-pip3 install roslibpy
-sudo apt install ros-humble-xacro ros-humble-robot-state-publisher \
-  ros-humble-joint-state-publisher ros-humble-joint-state-publisher-gui \
-  ros-humble-rviz2 ros-humble-tf2-ros
+sudo apt install ros-humble-rmw-cyclonedds-cpp ros-humble-xacro \
+  ros-humble-robot-state-publisher ros-humble-joint-state-publisher \
+  ros-humble-joint-state-publisher-gui ros-humble-rviz2 ros-humble-tf2-ros
 
 # 빌드
 cd ~/ugv_ws && source /opt/ros/humble/setup.bash
@@ -76,14 +80,14 @@ source install/setup.bash
 ### 매번 실행 (터미널 3개)
 
 ```bash
-# [터미널 1: RPi SSH] 하드웨어 드라이버 + rosbridge
+# [터미널 1: RPi SSH] 하드웨어 드라이버
 ssh pi@192.168.0.71
 source ~/ugv_ws/install/setup.bash
 ros2 launch ugv_roarm_description rasp_bringup.launch.py
 
-# [터미널 2: WSL] RViz + rosbridge 중계
+# [터미널 2: WSL] RViz (CycloneDDS로 자동 수신)
 source ~/ugv_ws/install/setup.bash
-ros2 launch ugv_roarm_description remote_view.launch.py host:=192.168.0.71
+ros2 launch ugv_roarm_description remote_view.launch.py
 
 # [터미널 3: WSL] 키보드 텔레옵
 source ~/ugv_ws/install/setup.bash
@@ -104,17 +108,14 @@ RoArm-M2 로봇팔을 시리얼(`/dev/ttyUSB0`)로 제어하는 ROS 2 드라이�
 - **Parameters**: `serial_port` (default: `/dev/ttyUSB0`), `baud_rate` (115200), `feedback_rate` (5.0)
 - 팔 관절 이동 시 그리퍼 토크 유지 (T:102에 항상 `hand` 값 포함)
 
-### Added: `rosbridge_relay` (in `ugv_bringup`)
+### Removed: `rosbridge_relay` (in `ugv_bringup`)
 
-WSL ↔ RPi ROS 2 토픽 브릿지 (rosbridge WebSocket 기반).
+CycloneDDS 직접 통신으로 전환하여 rosbridge WebSocket 브릿지는 더 이상 사용하지 않습니다.
 
-- **RPi → WSL**: `/joint_states`, `/scan`, `/odom`, `/imu/data_raw`, `/voltage`
-- **WSL → RPi**: `/cmd_vel`, `/arm_controller/joint_trajectory`, `/roarm/gripper_cmd`
-- URDF ↔ ESP32 변환 없이 값을 그대로 전달 (변환은 `roarm_driver`가 담당)
+### Odometry: `base_node` → `rf2o_laser_odometry`
 
-### Modified: `base_node` / `base_node_ekf`
-
-- `wheel_separation` 파라미터 추가 (기존 하드코딩 0.175 → 파라미터화)
+Wave Rover에 인코더가 없어 cmd_vel dead reckoning 방식의 오도메트리가 부정확했습니다.
+rf2o_laser_odometry (LiDAR 스캔 매칭 기반)로 교체하여 오도메트리 품질을 개선했습니다.
 
 ## 배포 (코드 수정 후)
 
@@ -130,7 +131,7 @@ git add -A && git commit -m "설명" && git push origin main
 cd ~/ugv_ws && git pull origin ros2-humble-develop
 cd src/ugv_main/ugv_roarm_description && git pull origin main
 cd ~/ugv_ws
-colcon build --packages-select ugv_bringup ugv_roarm_description
+colcon build --packages-select ugv_bringup rf2o_laser_odometry ugv_roarm_description
 source install/setup.bash
 ```
 
