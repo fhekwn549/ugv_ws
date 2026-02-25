@@ -85,6 +85,7 @@ class OdomPublisher : public rclcpp::Node
 
     // cmd_vel dead reckoning (for robots without encoders)
     bool use_cmd_vel_odom_ = false;
+    bool use_imu_yaw_ = true;
     float cmd_linear_x_ = 0.0;
     float cmd_angular_z_ = 0.0;
     rclcpp::Time last_integration_time_;
@@ -101,12 +102,14 @@ public:
         this->declare_parameter<bool>("pub_odom_tf", false);
         this->declare_parameter<double>("wheel_separation", 0.175);
         this->declare_parameter<bool>("use_cmd_vel_odom", false);
+        this->declare_parameter<bool>("use_imu_yaw", true);
 
         this->get_parameter<bool>("pub_odom_tf", pub_odom_tf_);
         this->get_parameter<std::string>("odom_frame", odom_frame);
         this->get_parameter<std::string>("base_footprint_frame", base_footprint_frame);
         this->get_parameter<double>("wheel_separation", wheel_separation_);
         this->get_parameter<bool>("use_cmd_vel_odom", use_cmd_vel_odom_);
+        this->get_parameter<bool>("use_imu_yaw", use_imu_yaw_);
 
         // Initialize transform broadcaster
         tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
@@ -144,6 +147,8 @@ private:
         q2 = msg->orientation.y;
         q3 = msg->orientation.z;
         q0 = msg->orientation.w;
+
+        if (!use_imu_yaw_) return;
 
         imu_received_ = true;
 
