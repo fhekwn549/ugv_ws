@@ -167,7 +167,7 @@ private:
     void handle_cmd_vel(const geometry_msgs::msg::Twist::SharedPtr msg)
     {
         cmd_linear_x_ = msg->linear.x;
-        cmd_angular_z_ = -msg->angular.z;
+        cmd_angular_z_ = msg->angular.z;
     }
 
     // Callback to handle raw odometry data and update position/velocity
