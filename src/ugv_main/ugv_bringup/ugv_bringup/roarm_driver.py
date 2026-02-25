@@ -95,12 +95,12 @@ class RoarmDriver(Node):
         # Enable torque
         self._serial_write({'T': 210, 'cmd': 1})
 
-        # Move to home pose
+        # Move to home pose (folded, gripper closed)
         self._serial_write({
-            'T': 102, 'base': 0, 'shoulder': 0, 'elbow': 0, 'hand': 0,
+            'T': 102, 'base': 0, 'shoulder': -1.6, 'elbow': 3.2, 'hand': 3,
             'spd': 0, 'acc': 10,
         })
-        self.get_logger().info('RoArm-M2 home pose set (0, 0, 0, 0)')
+        self.get_logger().info('RoArm-M2 home pose set (0, -1.6, 3.2, 3)')
 
         self.get_logger().info('RoArm-M2 driver ready')
 
