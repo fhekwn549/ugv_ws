@@ -83,6 +83,11 @@ def generate_launch_description():
     declare_log_level_cmd = DeclareLaunchArgument(
         'log_level', default_value='info',
         description='log level')
+
+    declare_pbstream_cmd = DeclareLaunchArgument(
+        'pbstream_path',
+        default_value=os.path.expanduser('~/maps/lab_map.pbstream'),
+        description='Full path to the Cartographer .pbstream file')
  
     # Specify the actions
     bringup_cmd_group = GroupAction([
@@ -103,7 +108,7 @@ def generate_launch_description():
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(os.path.join(cartographer_launch_dir,
                                                        'localization.launch.py')),
-            launch_arguments={'pbstream_path': '/home/ws/ugv_ws/src/ugv_main/ugv_nav/maps/map.pbstream',
+            launch_arguments={'pbstream_path': LaunchConfiguration('pbstream_path'),
                               'use_sim_time': use_sim_time}.items()),
 
         IncludeLaunchDescription(
@@ -133,6 +138,7 @@ def generate_launch_description():
     ld.add_action(declare_use_composition_cmd)
     ld.add_action(declare_use_respawn_cmd)
     ld.add_action(declare_log_level_cmd)
+    ld.add_action(declare_pbstream_cmd)
  
     # Add the actions to launch all of the navigation nodes
     ld.add_action(bringup_cmd_group)
