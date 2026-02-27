@@ -1,0 +1,40 @@
+bridge_node:
+  ros__parameters:
+    # ── Robot fleet configuration ──
+    # Comma-separated robot IDs
+    robot_ids: "ugv01"
+
+    # Per-robot ROS topic prefix (empty = root namespace, e.g. "" → /odom, "ugv01" → /ugv01/odom)
+    # When RPi uses ROS namespace, set the matching prefix here
+    ugv01_topic_prefix: ""
+
+    # ── MQTT broker (runs on this central server) ──
+    mqtt_host: "127.0.0.1"
+    mqtt_port: 1883
+    mqtt_keepalive: 60
+
+    # ── FastAPI server ──
+    api_host: "0.0.0.0"
+    api_port: 8080
+
+    # ── SQLite database ──
+    db_path: "~/ugv_bridge.db"
+
+    # ── Frontend static files (npm run build output) ──
+    static_dir: ""
+
+    # ── Publishing rates (Hz) ──
+    pose_rate: 10.0
+    voltage_rate: 1.0
+    joint_rate: 5.0
+    scan_rate: 5.0
+    sensor_snapshot_interval: 10.0
+
+    # LiDAR downsampling: keep every Nth point
+    scan_downsample: 4
+
+    # cmd_vel watchdog timeout (seconds)
+    cmd_vel_timeout: 0.5
+
+    # DB retention (days)
+    db_retention_days: 30

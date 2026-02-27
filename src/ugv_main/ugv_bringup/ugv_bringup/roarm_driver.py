@@ -106,29 +106,35 @@ class RoarmDriver(Node):
 
     def _serial_write(self, cmd_dict):
         with self.serial_lock:
-            data = json.dumps(cmd_dict) + '\n'
-            self.ser.write(data.encode())
+            try:
+                data = json.dumps(cmd_dict) + '\n'
+                self.ser.write(data.encode())
+            except serial.SerialException as e:
+                self.get_logger().error(f'Serial write error: {e}')
 
     def _serial_query(self, cmd_dict):
         with self.serial_lock:
-            self.ser.reset_input_buffer()
-            data = json.dumps(cmd_dict) + '\n'
-            self.ser.write(data.encode())
-            # ESP32 responds: echo -> \r\n -> actual JSON response
-            for _ in range(5):
-                raw = self.ser.readline()
-                if len(raw) == 0:
-                    break  # timeout, no data at all
-                line = raw.decode().strip()
-                if not line:
-                    continue  # skip blank lines (\r\n)
-                try:
-                    parsed = json.loads(line)
-                    if parsed.get('T') == cmd_dict.get('T'):
-                        continue  # skip echo
-                    return parsed
-                except (json.JSONDecodeError, UnicodeDecodeError):
-                    pass
+            try:
+                self.ser.reset_input_buffer()
+                data = json.dumps(cmd_dict) + '\n'
+                self.ser.write(data.encode())
+                # ESP32 responds: echo -> \r\n -> actual JSON response
+                for _ in range(5):
+                    raw = self.ser.readline()
+                    if len(raw) == 0:
+                        break  # timeout, no data at all
+                    line = raw.decode().strip()
+                    if not line:
+                        continue  # skip blank lines (\r\n)
+                    try:
+                        parsed = json.loads(line)
+                        if parsed.get('T') == cmd_dict.get('T'):
+                            continue  # skip echo
+                        return parsed
+                    except (json.JSONDecodeError, UnicodeDecodeError):
+                        pass
+            except serial.SerialException as e:
+                self.get_logger().error(f'Serial query error: {e}')
             return None
 
     def trajectory_callback(self, msg: JointTrajectory):
