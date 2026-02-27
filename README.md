@@ -1,10 +1,10 @@
 # ugv_ws (Fork)
 
-> Fork of [waveshareteam/ugv_ws](https://github.com/waveshareteam/ugv_ws) with RoArm-M2 integration.
+> Fork of [waveshareteam/ugv_ws](https://github.com/waveshareteam/ugv_ws) with RoArm-M2 integration + MQTT/REST API 웹 브릿지.
 
 ## 이 리포의 역할
 
-**로봇을 구동하는 드라이버 코드**를 관리합니다. 시리얼 통신으로 하드웨어(모터, 센서, 로봇팔)를 직접 제어하는 ROS 2 노드들이 포함되어 있습니다.
+**로봇을 구동하는 드라이버 코드와 웹 브릿지**를 관리합니다. 시리얼 통신으로 하드웨어(모터, 센서, 로봇팔)를 직접 제어하고, MQTT + REST API를 통해 웹 대시보드와 연동하는 ROS 2 노드들이 포함되어 있습니다.
 
 주로 **RPi에서 실행**되며, 로봇의 URDF 모델이나 시뮬레이션, launch 파일은 별도 리포([ugv_roarm_description](https://github.com/fhekwn549/ugv_roarm_description))에서 관리합니다.
 
@@ -12,10 +12,11 @@
 
 | 리포 | 역할 | 내용 |
 |------|------|------|
-| **이 리포 (`ugv_ws`)** | 하드웨어 구동 | 시리얼 드라이버, 센서 처리 |
-| [ugv_roarm_description](https://github.com/fhekwn549/ugv_roarm_description) | 로봇 정의 + 실행 구성 | URDF, launch, Gazebo 시뮬레이션, 텔레옵 |
+| **이 리포 (`ugv_ws`)** | 하드웨어 구동 + 웹 브릿지 | 시리얼 드라이버, 센서 처리, MQTT/REST 브릿지 |
+| [ugv_roarm_description](https://github.com/fhekwn549/ugv_roarm_description) | 로봇 정의 + 실행 구성 | URDF, launch, Gazebo 시뮬레이션, 텔레옵, Nav2 |
+| [ugv_dashboard](https://github.com/fhekwn549/ugv_dashboard) | 웹 대시보드 프론트엔드 | Vue 3 + MQTT.js, 맵/LiDAR 시각화, 원격 제어 |
 
-RPi에서는 두 리포 모두 필요합니다. `ugv_roarm_description`의 `rasp_bringup.launch.py`가 이 리포의 드라이버 노드들을 실행합니다.
+RPi에서는 `ugv_ws` + `ugv_roarm_description` 두 리포가 필요합니다. `ugv_roarm_description`의 `rasp_bringup.launch.py`가 이 리포의 드라이버 노드들을 실행합니다. 웹 대시보드는 `ugv_bridge`의 FastAPI가 정적 파일을 서빙합니다.
 
 ### 시리얼 포트 매핑 (RPi)
 
@@ -24,6 +25,32 @@ RPi에서는 두 리포 모두 필요합니다. `ugv_roarm_description`의 `rasp
 | `/dev/ttyAMA0` | UGV 바퀴 ESP32 | `ugv_driver` |
 | `/dev/ttyUSB0` | RoArm-M2 ESP32 | `roarm_driver` |
 | `/dev/ttyUSB1` | LDLidar (STL-19P) | `ldlidar_ros2` |
+
+### 시스템 아키텍처
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  웹 브라우저 (ugv_dashboard)                                │
+│  Vue 3 + MQTT.js + Canvas                                   │
+│  맵 시각화 / LiDAR 2D / 원격 제어 / Nav2 목표 전송          │
+└──────────┬──────────────────────┬───────────────────────────┘
+           │ MQTT (1884/ws)       │ REST API (8080)
+┌──────────▼──────────────────────▼───────────────────────────┐
+│  ugv_bridge (이 리포)                                       │
+│  FastAPI + paho-mqtt + SQLite                               │
+│  ROS 2 ↔ MQTT/REST 브릿지                                  │
+│  - 실시간: pose, map_pose, joints, scan, voltage → MQTT     │
+│  - 제어: navigate, cmd_vel, arm, gripper ← REST API         │
+│  - 맵: OccupancyGrid → PNG 변환                            │
+│  - 로깅: SQLite (commands, nav, events)                     │
+└──────────┬──────────────────────────────────────────────────┘
+           │ CycloneDDS (ROS 2 토픽)
+┌──────────▼──────────────────────────────────────────────────┐
+│  RPi ROS 2 노드                                            │
+│  ugv_driver + roarm_driver + ldlidar + rf2o_laser_odometry  │
+│  Cartographer (SLAM/localization) + Nav2                    │
+└─────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -43,9 +70,10 @@ cd ~ && git clone -b ros2-humble-develop https://github.com/fhekwn549/ugv_ws.git
 cd ~/ugv_ws/src/ugv_main && git clone https://github.com/fhekwn549/ugv_roarm_description.git
 
 # 의존성
-pip3 install pyserial
+pip3 install pyserial fastapi uvicorn paho-mqtt
 sudo apt install ros-humble-rmw-cyclonedds-cpp ros-humble-xacro \
-  ros-humble-robot-state-publisher ros-humble-joint-state-publisher
+  ros-humble-robot-state-publisher ros-humble-joint-state-publisher \
+  mosquitto
 
 # 스왑 추가 (RPi RAM 1GB인 경우, rf2o C++ 빌드 OOM 방지)
 sudo fallocate -l 2G /swapfile
@@ -54,8 +82,8 @@ echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 
 # 빌드
 cd ~/ugv_ws && source /opt/ros/humble/setup.bash
-colcon build --packages-select ugv_bringup ugv_roarm_description ugv_description \
-  rf2o_laser_odometry ugv_interface ldlidar
+colcon build --packages-select ugv_bringup ugv_bridge ugv_roarm_description \
+  ugv_description rf2o_laser_odometry ugv_interface ldlidar
 source install/setup.bash
 ```
 
@@ -98,15 +126,34 @@ ros2 run ugv_roarm_description teleop_all.py --ros-args -p mode:=rviz -p model:=
 
 ## Changes from upstream
 
+### Added: `ugv_bridge` (MQTT + REST API 웹 브릿지)
+
+ROS 2 토픽을 MQTT/REST API로 변환하여 웹 대시보드와 연동하는 브릿지 노드.
+
+| 모듈 | 역할 |
+|------|------|
+| `bridge_node.py` | 메인 ROS 2 노드 |
+| `ros_interface.py` | ROS 2 토픽 구독/발행 + TF2 리스너 |
+| `mqtt_bridge.py` | MQTT 발행 (pose, map_pose, joints, scan, voltage, nav_status) |
+| `api_app.py` | FastAPI REST 엔드포인트 (navigate, cmd_vel, arm, gripper, map) |
+| `db_writer.py` | SQLite 로깅 (명령, 네비게이션, 이벤트) |
+| `map_converter.py` | OccupancyGrid → PNG 변환 (순수 stdlib, Pillow 불필요) |
+
+- **MQTT 브로커**: Mosquitto (1883 native, 1884 WebSocket)
+- **REST API**: FastAPI on port 8080 (정적 파일 서빙 포함)
+- **DB**: SQLite WAL 모드 (`~/ugv_bridge.db`)
+- **멀티 로봇**: `robot_id` 파라미터로 MQTT 네임스페이스 분리 (default: `ugv01`)
+
 ### Added: `roarm_driver` (in `ugv_bringup`)
 
 RoArm-M2 로봇팔을 시리얼(`/dev/ttyUSB0`)로 제어하는 ROS 2 드라이버 노드.
 
-- **Subscribe**: `/arm_controller/joint_trajectory` (JointTrajectory) → T:102 시리얼 명령
-- **Subscribe**: `/roarm/gripper_cmd` (Float64) → T:106 그리퍼 명령
+- **Subscribe**: `/arm_controller/joint_trajectory` (JointTrajectory) → T:102 시리얼 명령 (팔 3관절만)
+- **Subscribe**: `/roarm/gripper_cmd` (Float64) → T:106 그리퍼 명령 (독립 제어)
 - **Publish**: `/joint_states` (JointState) ← T:105 주기적 조회 (5Hz)
 - **Parameters**: `serial_port` (default: `/dev/ttyUSB0`), `baud_rate` (115200), `feedback_rate` (5.0)
 - 팔 관절 이동 시 그리퍼 토크 유지 (T:102에 항상 `hand` 값 포함)
+- 시리얼 에러 발생 시 노드 크래시 방지 (try/catch)
 
 ### Removed: `rosbridge_relay` (in `ugv_bringup`)
 
@@ -116,6 +163,10 @@ CycloneDDS 직접 통신으로 전환하여 rosbridge WebSocket 브릿지는 더
 
 Wave Rover에 인코더가 없어 cmd_vel dead reckoning 방식의 오도메트리가 부정확했습니다.
 rf2o_laser_odometry (LiDAR 스캔 매칭 기반)로 교체하여 오도메트리 품질을 개선했습니다.
+
+### SLAM: `slam_toolbox` → `Cartographer`
+
+Cartographer SLAM으로 전환하여 매핑 품질을 개선했습니다. Cartographer의 pure localization 모드를 활용한 Nav2 자율주행을 지원합니다.
 
 ## 배포 (코드 수정 후)
 
@@ -131,7 +182,7 @@ git add -A && git commit -m "설명" && git push origin main
 cd ~/ugv_ws && git pull origin ros2-humble-develop
 cd src/ugv_main/ugv_roarm_description && git pull origin main
 cd ~/ugv_ws
-colcon build --packages-select ugv_bringup rf2o_laser_odometry ugv_roarm_description
+colcon build --packages-select ugv_bringup ugv_bridge rf2o_laser_odometry ugv_roarm_description
 source install/setup.bash
 ```
 
