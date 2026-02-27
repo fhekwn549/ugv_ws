@@ -90,7 +90,8 @@ class RoarmDriver(Node):
         self.feedback_timer = self.create_timer(period, self.feedback_callback)
 
         # Track last gripper ESP32 value (to include in T:102 commands)
-        self.last_gripper_esp32 = None
+        # Initialize to home pose hand value
+        self.last_gripper_esp32 = 3.0
 
         # Enable torque
         self._serial_write({'T': 210, 'cmd': 1})
@@ -176,6 +177,9 @@ class RoarmDriver(Node):
                 urdf_angle = esp32_to_urdf(joint_name, esp32_angle)
                 js.name.append(joint_name)
                 js.position.append(urdf_angle)
+                # Track actual gripper position from hardware feedback
+                if field == 't':
+                    self.last_gripper_esp32 = round(esp32_angle, 4)
 
         # Wheel joints (no encoders, publish 0.0 so robot_state_publisher
         # has a complete TF tree)

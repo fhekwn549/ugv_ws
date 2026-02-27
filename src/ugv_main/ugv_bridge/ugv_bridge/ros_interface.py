@@ -166,12 +166,13 @@ class RosInterface:
             "arm_base_link_to_arm_link1",
             "arm_link1_to_arm_link2",
             "arm_link2_to_arm_link3",
-            "arm_link3_to_arm_gripper_link",
         ]
+        # Only use first 3 positions (arm joints, no gripper)
+        arm_positions = [float(p) for p in positions[:3]]
         msg = JointTrajectory()
         msg.joint_names = joint_names
         pt = JointTrajectoryPoint()
-        pt.positions = [float(p) for p in positions]
+        pt.positions = arm_positions
         pt.time_from_start = Duration(sec=0, nanosec=500_000_000)
         msg.points = [pt]
         self._arm_pub.publish(msg)
