@@ -64,6 +64,8 @@ class RobotState:
         self.map_meta: Optional[MapMeta] = None
         self.map_png: Optional[bytes] = None
         self.map_revision: int = 0
+        self.map_pose = Pose()
+        self.map_pose_valid: bool = False
 
     # -- writers (called from ROS callbacks) --
 
@@ -112,6 +114,13 @@ class RobotState:
         with self._lock:
             self.path = points
 
+    def update_map_pose(self, x: float, y: float, yaw: float):
+        with self._lock:
+            self.map_pose.x = x
+            self.map_pose.y = y
+            self.map_pose.yaw = yaw
+            self.map_pose_valid = True
+
     def update_map(self, meta: MapMeta, png_bytes: bytes):
         with self._lock:
             self.map_meta = meta
@@ -119,6 +128,15 @@ class RobotState:
             self.map_revision += 1
 
     # -- readers (called from FastAPI / MQTT) --
+
+    def snapshot_map_pose(self) -> dict:
+        with self._lock:
+            return {
+                "x": round(self.map_pose.x, 4),
+                "y": round(self.map_pose.y, 4),
+                "yaw": round(self.map_pose.yaw, 4),
+                "valid": self.map_pose_valid,
+            }
 
     def snapshot_pose(self) -> dict:
         with self._lock:
@@ -149,7 +167,7 @@ class RobotState:
                 "angle_increment": self.scan.angle_increment * downsample,
                 "range_min": self.scan.range_min,
                 "range_max": self.scan.range_max,
-                "ranges": [round(r, 3) for r in ranges],
+                "ranges": [round(r, 3) if math.isfinite(r) else None for r in ranges],
             }
 
     def snapshot_nav(self) -> dict:

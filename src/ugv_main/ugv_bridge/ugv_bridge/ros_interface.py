@@ -14,6 +14,9 @@ from rclpy.qos import (
     QoSReliabilityPolicy,
 )
 from rclpy.action import ActionClient
+from rclpy.time import Time
+
+import tf2_ros
 
 from geometry_msgs.msg import Twist, PoseWithCovarianceStamped
 from nav_msgs.msg import Odometry, OccupancyGrid, Path
@@ -72,6 +75,7 @@ class RosInterface:
         self._setup_subscribers()
         self._setup_publishers()
         self._setup_nav2()
+        self._setup_tf2()
 
     def _topic(self, name: str) -> str:
         """Build full topic name with optional prefix."""
@@ -199,6 +203,27 @@ class RosInterface:
         self._db.log_event(
             self._robot_id, "info", "amcl",
             f"Initial pose set: ({x:.2f}, {y:.2f}, {math.degrees(yaw):.1f}°)")
+
+    # -- TF2 map pose --
+
+    def _setup_tf2(self):
+        self._tf_buffer = tf2_ros.Buffer()
+        self._tf_listener = tf2_ros.TransformListener(
+            self._tf_buffer, self._node)
+        self._node.create_timer(0.1, self._tf_timer_cb)  # 10 Hz
+
+    def _tf_timer_cb(self):
+        try:
+            t = self._tf_buffer.lookup_transform(
+                'map', 'base_link', Time())
+            x = t.transform.translation.x
+            y = t.transform.translation.y
+            yaw = _quat_to_yaw(t.transform.rotation)
+            self._state.update_map_pose(x, y, yaw)
+        except (tf2_ros.LookupException,
+                tf2_ros.ConnectivityException,
+                tf2_ros.ExtrapolationException):
+            pass
 
     # -- Nav2 action --
 

@@ -119,6 +119,7 @@ class MqttBridge:
             "voltage": 1.0 / max(self._voltage_rate, 0.1),
             "joints": 1.0 / max(self._joint_rate, 0.1),
             "scan": 1.0 / max(self._scan_rate, 0.1),
+            "map_pose": 1.0 / max(self._pose_rate, 0.1),
         }
         last = {k: 0.0 for k in intervals}
         last_map_rev = -1
@@ -149,6 +150,13 @@ class MqttBridge:
                                    qos=0)
                 last["scan"] = now
 
+            # Map pose (TF-based)
+            if now - last["map_pose"] >= intervals["map_pose"]:
+                self._publish_json("map_pose",
+                                   self._state.snapshot_map_pose(),
+                                   qos=0)
+                last["map_pose"] = now
+
             # Nav status (event-driven)
             nav = self._state.snapshot_nav()
             if nav["status"] != last_nav_status:
@@ -178,7 +186,14 @@ class MqttBridge:
         if not self._client or not self._client.is_connected():
             return
         try:
-            payload = json.dumps(data, separators=(",", ":"))
+            payload = json.dumps(data, separators=(",", ":"),
+                                 allow_nan=False)
+            self._client.publish(self._topic(suffix), payload, qos=qos)
+        except ValueError:
+            # Fallback: replace NaN/Inf with null
+            payload = json.dumps(data, separators=(",", ":"),
+                                 default=str)
+            payload = payload.replace("NaN", "null").replace("Infinity", "null")
             self._client.publish(self._topic(suffix), payload, qos=qos)
         except Exception:
             pass
