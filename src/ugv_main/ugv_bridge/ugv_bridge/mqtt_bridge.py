@@ -124,6 +124,7 @@ class MqttBridge:
         last = {k: 0.0 for k in intervals}
         last_map_rev = -1
         last_nav_status = ""
+        last_path_len = 0
 
         while self._running:
             now = time.monotonic()
@@ -157,16 +158,23 @@ class MqttBridge:
                                    qos=0)
                 last["map_pose"] = now
 
-            # Nav status (event-driven)
+            # Nav status (event-driven + periodic during navigating)
             nav = self._state.snapshot_nav()
-            if nav["status"] != last_nav_status:
-                self._publish_json("nav_status", nav, qos=1)
+            nav_changed = nav["status"] != last_nav_status
+            nav_periodic = (nav["status"] == "navigating" and
+                            now - last.get("nav", 0) >= 1.0)
+            if nav_changed or nav_periodic:
+                self._publish_json("nav_status", nav,
+                                   qos=1 if nav_changed else 0)
                 last_nav_status = nav["status"]
+                last["nav"] = now
 
-            # Path (event-driven via map revision as proxy)
+            # Path (publish only when changed)
             path = self._state.snapshot_path()
-            if path["poses"]:
+            path_len = len(path["poses"])
+            if path_len != last_path_len:
                 self._publish_json("path", path, qos=0)
+                last_path_len = path_len
 
             # Map updated notification
             rev = self._state.snapshot_map_revision()
