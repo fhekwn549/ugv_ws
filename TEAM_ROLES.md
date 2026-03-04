@@ -46,6 +46,7 @@ UGV RoArm 프로젝트의 업무 영역 정의와 담당자 배정 문서입니�
 |------|---------|
 | URDF/Xacro 모델링 | **B** (HW & 자율주행) |
 | Nav2/SLAM 파라미터 | **B** (HW & 자율주행) |
+| nav_sim 경량 시뮬레이션 (fake_odom, fake_scan) | **B** (HW & 자율주행) |
 | Gazebo 시뮬레이션 | **B** (HW & 자율주행) |
 | 로봇팔 ros2_control | **B** (HW & 자율주행) |
 

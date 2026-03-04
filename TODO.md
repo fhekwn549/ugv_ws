@@ -55,26 +55,25 @@
 - [x] 발표자료 PPT 작성 (16슬라이드, 2개 합본)
 - [x] README 전면 업데이트 (ugv_roarm_description, ugv_dashboard, ugv_ws)
 
----
+### 경량 Nav2 시뮬레이션 (nav_sim)
+- [x] Gazebo 제거한 경량 시뮬레이션 환경 구축 (fake_odom + fake_scan + Nav2)
+- [x] fake_odom_node.py (cmd_vel → 2D 운동학 적분 → odom + TF)
+- [x] fake_scan_node.py (맵 기반 360도 레이캐스팅 → /scan + /dev/shm)
+- [x] nav_sim.launch.py (robot_state_publisher + Nav2 + RViz 통합 런치)
+- [x] nav2_params_fake.yaml (경량 시뮬레이션 전용 Nav2 파라미터)
+- [x] ugv_roarm.xacro use_gazebo 조건부 추가 (Gazebo 플러그인 선택적 포함)
 
-## 3/4 (화): 자율주행 정밀화 + 팀 업무 분담 환경 구축
-
-### 자율주행 추가 튜닝
-
-- [ ] RPi에 ugv_bridge 최신 버전 배포 및 실 로봇 네비게이션 테스트
-- [ ] 실 로봇에서 Nav2 경로 추종 정밀도 검증 (RPP 파라미터 실환경 확인)
-- [ ] 웹 대시보드에서 Cancel Navigation 동작 안정성 개선
-- [ ] WSL2 Gazebo 저성능 환경에서 Nav2 경로 추종 추가 최적화
-- [ ] Cartographer localization 모드에서 pbstream 경로 파라미터화 테스트
+### WSL2 CycloneDDS LiDAR 바이패스
+- [x] /dev/shm 파일 기반 IPC로 DDS 우회 (fake_scan_node → ugv_bridge)
+- [x] ugv_bridge ros_interface.py: /dev/shm 폴링 + DDS fallback (실제 로봇 대응)
+- [x] 웹 대시보드 LiDAR 실시간 업데이트 확인
 
 ### 팀 업무 분담 환경 구축
-
-현재까지 작업한 3개 리포를 업무 영역별로 분담할 수 있도록 환경을 구성한다.
-
-- [ ] 리포별 업무 영역 정의 및 담당자 분배 기준 작성
-- [ ] 각 리포에 CONTRIBUTING.md 작성 (빌드 방법, 브랜치 전략, PR 규칙)
+- [x] 리포별 업무 영역 정의 및 담당자 분배 기준 작성 (TEAM_ROLES.md)
+- [x] 각 리포에 CONTRIBUTING.md 작성 (빌드 방법, 브랜치 전략, PR 규칙)
+- [x] GitHub CODEOWNERS 설정 (ugv_ws, ugv_roarm_description, ugv_dashboard)
+- [x] PR/Issue 템플릿 작성 (.github/PULL_REQUEST_TEMPLATE.md, ISSUE_TEMPLATE/)
 - [ ] GitHub branch protection 규칙 설정 (main/develop 브랜치 보호)
-- [ ] 기능별 브랜치 전략 수립 (feature/*, bugfix/* 네이밍 컨벤션)
 - [ ] 팀원별 개발 환경 세팅 가이드 (WSL + RPi + CycloneDDS)
 
 #### 업무 분담 기준안
@@ -83,10 +82,21 @@
 |------|------|----------|
 | **하드웨어/드라이버** | ugv_ws | 모터 드라이버, 센서 인터페이스, 시리얼 통신 |
 | **네비게이션/SLAM** | ugv_roarm_description | Nav2 튜닝, 맵 관리, Cartographer 설정 |
-| **로봇 모델/시뮬레이션** | ugv_roarm_description | URDF, Gazebo 월드, ros2_control |
-| **웹 프론트엔드** | ugv_dashboard | Vue 3 UI, Canvas 시각화, MQTT 구독 |
+| **로봇 모델/시뮬레이션** | ugv_roarm_description | URDF, nav_sim/Gazebo, ros2_control |
+| **웹 프론트엔드** | ugv_dashboard | Vue 3 UI, Canvas 시각화, STOMP 구독 |
 | **웹 백엔드/브릿지** | ugv_ws (ugv_bridge) | FastAPI, MQTT 발행, Nav2 연동, DB |
 | **미션/태스크 관리** | 신규 리포 | Spring Boot 백엔드, 웨이포인트 미션 |
+
+---
+
+## 3/4 (화) 이후: 자율주행 정밀화
+
+### 자율주행 추가 튜닝
+
+- [ ] RPi에 ugv_bridge 최신 버전 배포 및 실 로봇 네비게이션 테스트
+- [ ] 실 로봇에서 Nav2 경로 추종 정밀도 검증 (RPP 파라미터 실환경 확인)
+- [ ] 웹 대시보드에서 Cancel Navigation 동작 안정성 개선
+- [ ] Cartographer localization 모드에서 pbstream 경로 파라미터화 테스트
 
 ---
 
