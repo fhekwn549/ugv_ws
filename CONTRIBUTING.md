@@ -9,7 +9,7 @@ UGV RoArm 프로젝트의 메인 워크스페이스 리포지토리에 기여하
 | 항목 | 버전 |
 |------|------|
 | OS | Ubuntu 22.04 (WSL2 또는 네이티브) |
-| ROS 2 | Humble Hawksbill |
+| ROS 2 | Humble |
 | Python | 3.10+ |
 | DDS | CycloneDDS |
 | 빌드 도구 | colcon |
