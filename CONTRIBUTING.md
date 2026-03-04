@@ -14,8 +14,6 @@ UGV RoArm 프로젝트의 메인 워크스페이스 리포지토리에 기여하
 | DDS | CycloneDDS |
 | 빌드 도구 | colcon |
 
-> 상세 설치 가이드는 [DEV_SETUP_GUIDE.md](./DEV_SETUP_GUIDE.md)를 참고하세요.
-
 ---
 
 ## 리포지토리 클론 및 빌드
@@ -25,7 +23,7 @@ UGV RoArm 프로젝트의 메인 워크스페이스 리포지토리에 기여하
 ```bash
 mkdir -p ~/ugv_ws/src
 cd ~/ugv_ws
-git clone https://github.com/fhekwn549/ugv_ws.git .
+git clone https://github.com/ubisamRAD/ugv_ws.git .
 ```
 
 ### 의존성 설치
@@ -169,17 +167,141 @@ ros2 launch ugv_bringup bringup_launch.py
 
 ## 브랜치 전략
 
-[BRANCHING_STRATEGY.md](./BRANCHING_STRATEGY.md)를 참고하세요.
+기여자(팀원)별 브랜치를 생성하고, 기본 브랜치로 PR을 보내는 방식입니다.
+
+```
+ros2-humble-develop  ← 보호된 기본 브랜치 (직접 push 불가)
+ ├── jeonghun/add-lidar-filter    ← 기여자별 작업 브랜치
+ ├── minsoo/fix-nav2-param
+ └── jiyeon/update-bridge-api
+```
+
+### 브랜치 네이밍
+
+```
+<이름>/<간단한-설명>
+```
+
+- 소문자만 사용, 단어 구분은 하이픈(`-`)
+- `<이름>`은 GitHub 사용자명 또는 이름
+- 설명은 영어로 간결하게 (3~5 단어)
 
 ---
 
-## PR 작성 가이드
+## 작업 흐름 튜토리얼 (처음부터 끝까지)
 
-1. **브랜치 생성**: 기본 브랜치(`ros2-humble-develop`)에서 `<이름>/<설명>` 브랜치 생성
-2. **작업 수행**: 변경사항 커밋 (Conventional Commits 형식, 영어)
-3. **빌드 확인**: `colcon build`가 성공하는지 확인
-4. **PR 생성**: GitHub에서 기본 브랜치로 PR 생성
-5. **PR 본문**: 변경 사항, 테스트 방법, 관련 이슈를 기재
+### Step 1: 기본 브랜치를 최신으로 업데이트
+
+```bash
+cd ~/ugv_ws
+git checkout ros2-humble-develop
+git pull origin ros2-humble-develop
+```
+
+### Step 2: 내 작업 브랜치 만들기
+
+```bash
+git checkout -b jeonghun/add-battery-alert
+```
+
+> `jeonghun` 부분을 본인 이름으로 바꾸세요.
+> 이 명령은 브랜치를 만들고 동시에 그 브랜치로 전환합니다.
+
+현재 브랜치 확인:
+
+```bash
+git branch
+# * jeonghun/add-battery-alert   ← 현재 브랜치 (* 표시)
+#   ros2-humble-develop
+```
+
+### Step 3: 코드 수정
+
+파일을 수정하고, 빌드가 되는지 확인합니다:
+
+```bash
+colcon build --symlink-install --packages-select ugv_bridge
+```
+
+### Step 4: 변경사항 확인 및 커밋
+
+```bash
+# 어떤 파일이 변경되었는지 확인
+git status
+
+# 변경된 파일을 스테이징 (커밋할 파일 선택)
+git add src/ugv_main/ugv_bridge/ugv_bridge/api_app.py
+git add src/ugv_main/ugv_bridge/ugv_bridge/mqtt_bridge.py
+
+# 커밋 (메시지는 영어로)
+git commit -m "feat(bridge): add low battery alert endpoint"
+```
+
+> **주의**: `git add .`은 의도하지 않은 파일까지 포함될 수 있으니, 변경한 파일만 지정하세요.
+
+### Step 5: GitHub에 push
+
+```bash
+git push -u origin jeonghun/add-battery-alert
+```
+
+> 처음 push할 때는 `-u` 옵션이 필요합니다. 이후 같은 브랜치에서는 `git push`만 하면 됩니다.
+
+### Step 6: GitHub에서 PR (Pull Request) 만들기
+
+1. GitHub 리포 페이지에 접속하면 상단에 **"Compare & pull request"** 버튼이 나타납니다 → 클릭
+
+2. 또는 **Pull requests** 탭 → **New pull request** → base를 `ros2-humble-develop`, compare를 본인 브랜치로 선택
+
+3. PR 작성:
+   - **제목**: 커밋 메시지와 동일한 형식 (예: `feat(bridge): add low battery alert endpoint`)
+   - **본문**: 변경 사항, 테스트 방법, 관련 이슈를 기재
+   - **Create pull request** 클릭
+
+### Step 7: 코드 리뷰 & 머지
+
+1. 팀원 1명이 PR을 리뷰하고 **Approve** (승인)
+2. 승인 후 **Merge pull request** → **Confirm merge** 클릭
+3. 머지 완료 후 **Delete branch** 클릭 (GitHub 원격 브랜치 삭제)
+
+### Step 8: 로컬 정리
+
+```bash
+# 기본 브랜치로 돌아가서 최신 받기
+git checkout ros2-humble-develop
+git pull origin ros2-humble-develop
+
+# 머지 완료된 로컬 브랜치 삭제
+git branch -d jeonghun/add-battery-alert
+```
+
+### 요약 흐름도
+
+```
+git pull → git checkout -b <이름>/<설명> → 코드 수정 → git add → git commit → git push
+→ GitHub에서 PR 생성 → 리뷰 승인 → Merge → 로컬 정리
+```
+
+---
+
+## 커밋 메시지 컨벤션
+
+[Conventional Commits](https://www.conventionalcommits.org/) 스타일. **영어로 작성합니다.**
+
+```
+<type>(<scope>): <subject>
+```
+
+| Type | 설명 | 예시 |
+|------|------|------|
+| `feat` | 새로운 기능 | `feat(bridge): add battery status endpoint` |
+| `fix` | 버그 수정 | `fix(bridge): resolve MQTT reconnect issue` |
+| `docs` | 문서 변경 | `docs: update CONTRIBUTING.md` |
+| `refactor` | 코드 리팩토링 | `refactor(slam): simplify map update logic` |
+| `test` | 테스트 추가/수정 | `test(nav): add waypoint following test` |
+| `chore` | 빌드/설정 등 | `chore: update colcon build flags` |
+
+Scope는 패키지명 사용: `bridge`, `nav`, `slam`, `gazebo`, `bringup`, `description`, `vision` 등
 
 ---
 
@@ -189,15 +311,11 @@ ros2 launch ugv_bringup bringup_launch.py
 
 - [PEP 8](https://peps.python.org/pep-0008/) 준수
 - 타입 힌트 사용 권장
-- ROS 2 노드는 프로젝트의 Clean Architecture 패턴을 따름
-  - Domain 계층에 ROS 2 의존성 금지
-  - Infrastructure 계층에서 ROS 2 어댑터 구현
 
 ### C++
 
 - ROS 2 C++ 스타일 가이드 준수
 - 헤더 파일은 `include/<package_name>/` 하위에 배치
-- `ament_lint_auto` 사용
 
 ### Launch 파일
 
