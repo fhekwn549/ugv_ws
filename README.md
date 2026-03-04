@@ -2,6 +2,8 @@
 
 > Fork of [waveshareteam/ugv_ws](https://github.com/waveshareteam/ugv_ws) with RoArm-M2 integration + MQTT/REST API 웹 브릿지.
 
+> **처음 세팅하시나요?** → [개발 환경 세팅 가이드 (DEV_SETUP_GUIDE.md)](DEV_SETUP_GUIDE.md)를 참고하세요.
+
 ## 이 리포의 역할
 
 **로봇을 구동하는 드라이버 코드와 웹 브릿지**를 관리합니다. 시리얼 통신으로 하드웨어(모터, 센서, 로봇팔)를 직접 제어하고, MQTT + REST API를 통해 웹 대시보드와 연동하는 ROS 2 노드들이 포함되어 있습니다.
