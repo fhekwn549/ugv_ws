@@ -171,20 +171,15 @@ ros2 launch ugv_bringup bringup_launch.py
 
 ```
 ros2-humble-develop  ← 보호된 기본 브랜치 (직접 push 불가)
- ├── jeonghun/add-lidar-filter    ← 기여자별 작업 브랜치
- ├── minsoo/fix-nav2-param
- └── jiyeon/update-bridge-api
+ ├── jeonghun        ← 기여자별 작업 브랜치 (본인 이름)
+ ├── minsoo
+ └── jiyeon
 ```
 
 ### 브랜치 네이밍
 
-```
-<이름>/<간단한-설명>
-```
-
-- 소문자만 사용, 단어 구분은 하이픈(`-`)
-- `<이름>`은 GitHub 사용자명 또는 이름
-- 설명은 영어로 간결하게 (3~5 단어)
+- 본인 이름을 브랜치명으로 사용 (예: `jeonghun`, `minsoo`)
+- 소문자만 사용
 
 ---
 
@@ -201,7 +196,7 @@ git pull origin ros2-humble-develop
 ### Step 2: 내 작업 브랜치 만들기
 
 ```bash
-git checkout -b jeonghun/add-battery-alert
+git checkout -b jeonghun
 ```
 
 > `jeonghun` 부분을 본인 이름으로 바꾸세요.
@@ -211,7 +206,7 @@ git checkout -b jeonghun/add-battery-alert
 
 ```bash
 git branch
-# * jeonghun/add-battery-alert   ← 현재 브랜치 (* 표시)
+# * jeonghun                 ← 현재 브랜치 (* 표시)
 #   ros2-humble-develop
 ```
 
@@ -242,7 +237,7 @@ git commit -m "feat(bridge): add low battery alert endpoint"
 ### Step 5: GitHub에 push
 
 ```bash
-git push -u origin jeonghun/add-battery-alert
+git push -u origin jeonghun
 ```
 
 > 처음 push할 때는 `-u` 옵션이 필요합니다. 이후 같은 브랜치에서는 `git push`만 하면 됩니다.
@@ -272,13 +267,13 @@ git checkout ros2-humble-develop
 git pull origin ros2-humble-develop
 
 # 머지 완료된 로컬 브랜치 삭제
-git branch -d jeonghun/add-battery-alert
+git branch -d jeonghun
 ```
 
 ### 요약 흐름도
 
 ```
-git pull → git checkout -b <이름>/<설명> → 코드 수정 → git add → git commit → git push
+git pull → git checkout -b <이름> → 코드 수정 → git add → git commit → git push
 → GitHub에서 PR 생성 → 리뷰 승인 → Merge → 로컬 정리
 ```
 
