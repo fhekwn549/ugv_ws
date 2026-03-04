@@ -4,7 +4,9 @@ Each RosInterface instance manages one robot's topics,
 optionally prefixed (e.g. "" → /odom, "ugv01" → /ugv01/odom).
 """
 
+import json
 import math
+import os
 
 from rclpy.node import Node
 from rclpy.qos import (
@@ -76,6 +78,7 @@ class RosInterface:
         self._setup_publishers()
         self._setup_nav2()
         self._setup_tf2()
+        self._setup_scan_shm()
 
     def _topic(self, name: str) -> str:
         """Build full topic name with optional prefix."""
@@ -92,8 +95,7 @@ class RosInterface:
             Float32, self._topic("voltage"), self._on_voltage, SENSOR_QOS)
         n.create_subscription(
             JointState, self._topic("joint_states"), self._on_joints, RELIABLE_QOS)
-        n.create_subscription(
-            LaserScan, self._topic("scan"), self._on_scan, SENSOR_QOS)
+        # /scan is handled by _setup_scan_shm() — DDS + /dev/shm fallback
         n.create_subscription(
             Imu, self._topic("imu/data"), self._on_imu, SENSOR_QOS)
         n.create_subscription(
@@ -145,6 +147,45 @@ class RosInterface:
             for p in msg.poses
         ]
         self._state.update_path(points)
+
+    # -- /scan via shared memory file (bypasses DDS on WSL2) --
+
+    _SHM_SCAN_PATH = "/dev/shm/ugv_scan.json"
+
+    def _setup_scan_shm(self):
+        """Poll /dev/shm for scan data written by fake_scan_node.
+
+        CycloneDDS on WSL2 has intermittent RELIABLE LaserScan delivery
+        stalls (0 msgs for 5-10s).  Reading from /dev/shm (RAM-backed
+        tmpfs) bypasses DDS entirely and provides reliable 10Hz updates.
+        Falls back to DDS subscription when the file doesn't exist
+        (e.g. real robot).
+        """
+        # DDS subscription as fallback (works for real robot)
+        self._node.create_subscription(
+            LaserScan, self._topic("scan"), self._on_scan, RELIABLE_QOS)
+
+        # /dev/shm poll timer (10 Hz)
+        self._scan_shm_mtime = 0.0
+        self._node.create_timer(0.1, self._scan_shm_timer_cb)
+
+    def _scan_shm_timer_cb(self):
+        """Read latest scan from /dev/shm if file was updated."""
+        try:
+            st = os.stat(self._SHM_SCAN_PATH)
+        except FileNotFoundError:
+            return  # no shm file → rely on DDS subscription
+        if st.st_mtime_ns == self._scan_shm_mtime:
+            return  # unchanged
+        self._scan_shm_mtime = st.st_mtime_ns
+        try:
+            with open(self._SHM_SCAN_PATH, "r") as f:
+                d = json.load(f)
+            self._state.update_scan(
+                d["angle_min"], d["angle_max"], d["angle_increment"],
+                d["range_min"], d["range_max"], d["ranges"])
+        except Exception:
+            pass  # partial write / race — skip this tick
 
     # -- publishers --
 
@@ -207,9 +248,11 @@ class RosInterface:
     # -- TF2 map pose --
 
     def _setup_tf2(self):
-        self._tf_buffer = tf2_ros.Buffer()
+        self._tf_buffer = tf2_ros.Buffer(node=self._node)
+        # spin_thread=True: TF callbacks run in dedicated thread,
+        # freeing the executor for /scan and other subscriptions
         self._tf_listener = tf2_ros.TransformListener(
-            self._tf_buffer, self._node)
+            self._tf_buffer, self._node, spin_thread=True)
         self._node.create_timer(0.1, self._tf_timer_cb)  # 10 Hz
 
     def _tf_timer_cb(self):
