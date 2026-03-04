@@ -44,4 +44,4 @@
 - [ ] `colcon build`가 성공함
 - [ ] 관련 테스트를 실행하고 통과함
 - [ ] 커밋 메시지가 Conventional Commits 형식을 따름
-- [ ] 다른 리포에 연관 PR이 필요한 경우 링크를 추가함
+- [ ] ugv_dashboard에 연관 PR이 필요한 경우 링크를 추가함

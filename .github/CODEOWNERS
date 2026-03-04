@@ -25,6 +25,7 @@ src/ugv_main/ugv_slam/          @TBD-hw-nav
 src/ugv_main/ugv_bringup/       @TBD-hw-nav
 src/ugv_main/ugv_description/   @TBD-hw-nav
 src/ugv_main/ugv_gazebo/        @TBD-hw-nav
+src/ugv_main/ugv_roarm_description/   @TBD-hw-nav
 
 # ============================================
 # 공동 관할 (양팀 리뷰 필요)

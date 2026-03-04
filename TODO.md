@@ -81,8 +81,8 @@
 | 영역 | 리포 | 주요 작업 |
 |------|------|----------|
 | **하드웨어/드라이버** | ugv_ws | 모터 드라이버, 센서 인터페이스, 시리얼 통신 |
-| **네비게이션/SLAM** | ugv_roarm_description | Nav2 튜닝, 맵 관리, Cartographer 설정 |
-| **로봇 모델/시뮬레이션** | ugv_roarm_description | URDF, nav_sim/Gazebo, ros2_control |
+| **네비게이션/SLAM** | ugv_ws (ugv_roarm_description) | Nav2 튜닝, 맵 관리, Cartographer 설정 |
+| **로봇 모델/시뮬레이션** | ugv_ws (ugv_roarm_description) | URDF, nav_sim/Gazebo, ros2_control |
 | **웹 프론트엔드** | ugv_dashboard | Vue 3 UI, Canvas 시각화, STOMP 구독 |
 | **웹 백엔드/브릿지** | ugv_ws (ugv_bridge) | FastAPI, MQTT 발행, Nav2 연동, DB |
 | **미션/태스크 관리** | 신규 리포 | Spring Boot 백엔드, 웨이포인트 미션 |
@@ -128,6 +128,5 @@
 
 | 리포 | 역할 | branch |
 |------|------|--------|
-| [ugv_roarm_description](https://github.com/fhekwn549/ugv_roarm_description) | URDF, launch, 텔레옵, SLAM, Nav2, Gazebo 시뮬레이션 | `main` |
-| [ugv_ws](https://github.com/fhekwn549/ugv_ws) | 하드웨어 드라이버 + ugv_bridge (MQTT/REST 브릿지) | `ros2-humble-develop` |
+| [ugv_ws](https://github.com/fhekwn549/ugv_ws) | 하드웨어 드라이버 + ugv_bridge + ugv_roarm_description (URDF, Nav2, 시뮬레이션) | `ros2-humble-develop` |
 | [ugv_dashboard](https://github.com/fhekwn549/ugv_dashboard) | 웹 대시보드 (Vue 3 + STOMP/WS) | `main` |

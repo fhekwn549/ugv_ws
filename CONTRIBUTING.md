@@ -67,7 +67,7 @@ src/ugv_main/
 ├── ugv_gazebo/          # Gazebo 시뮬레이션
 ├── ugv_interface/       # 커스텀 메시지/서비스
 ├── ugv_nav/             # 내비게이션
-├── ugv_roarm_description/ # RoArm URDF (서브모듈)
+├── ugv_roarm_description/ # RoArm URDF, Nav2, 시뮬레이션
 ├── ugv_slam/            # SLAM
 ├── ugv_tools/           # 유틸리티
 ├── ugv_vision/          # 카메라/비전

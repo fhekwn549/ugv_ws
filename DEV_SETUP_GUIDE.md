@@ -76,11 +76,6 @@ mkdir -p ~/ugv_ws/src
 cd ~/ugv_ws
 git clone https://github.com/fhekwn549/ugv_ws.git .
 
-# 서브모듈(ugv_roarm_description) 초기화
-cd src/ugv_main/ugv_roarm_description
-git clone https://github.com/fhekwn549/ugv_roarm_description.git .
-cd ~/ugv_ws
-
 # 의존성 설치
 rosdep install --from-paths src --ignore-src -r -y
 

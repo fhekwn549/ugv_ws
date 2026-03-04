@@ -6,17 +6,16 @@
 
 **로봇을 구동하는 드라이버 코드와 웹 브릿지**를 관리합니다. 시리얼 통신으로 하드웨어(모터, 센서, 로봇팔)를 직접 제어하고, MQTT + REST API를 통해 웹 대시보드와 연동하는 ROS 2 노드들이 포함되어 있습니다.
 
-주로 **RPi에서 실행**되며, 로봇의 URDF 모델이나 시뮬레이션, launch 파일은 별도 리포([ugv_roarm_description](https://github.com/fhekwn549/ugv_roarm_description))에서 관리합니다.
+주로 **RPi에서 실행**되며, 로봇의 URDF 모델이나 시뮬레이션, launch 파일은 `src/ugv_main/ugv_roarm_description/` 패키지에서 관리합니다.
 
 ### 리포 구조
 
 | 리포 | 역할 | 내용 |
 |------|------|------|
-| **이 리포 (`ugv_ws`)** | 하드웨어 구동 + 웹 브릿지 | 시리얼 드라이버, 센서 처리, MQTT/REST 브릿지 |
-| [ugv_roarm_description](https://github.com/fhekwn549/ugv_roarm_description) | 로봇 정의 + 실행 구성 | URDF, launch, Gazebo 시뮬레이션, 텔레옵, Nav2 |
+| **이 리포 (`ugv_ws`)** | 하드웨어 구동 + 웹 브릿지 + 로봇 정의 | 시리얼 드라이버, 센서 처리, MQTT/REST 브릿지, URDF, launch, Nav2, Gazebo 시뮬레이션 |
 | [ugv_dashboard](https://github.com/fhekwn549/ugv_dashboard) | 웹 대시보드 프론트엔드 | Vue 3 + STOMP/WebSocket, 맵/LiDAR 시각화, 원격 제어 |
 
-RPi에서는 `ugv_ws` + `ugv_roarm_description` 두 리포가 필요합니다. `ugv_roarm_description`의 `rasp_bringup.launch.py`가 이 리포의 드라이버 노드들을 실행합니다. 웹 대시보드는 `ugv_bridge`의 FastAPI가 정적 파일을 서빙합니다.
+RPi에서는 `ugv_ws` 하나만 클론하면 됩니다. `ugv_roarm_description`의 `rasp_bringup.launch.py`가 드라이버 노드들을 실행합니다. 웹 대시보드는 `ugv_bridge`의 FastAPI가 정적 파일을 서빙합니다.
 
 ### 시리얼 포트 매핑 (RPi)
 
@@ -60,7 +59,7 @@ RPi에서는 `ugv_ws` + `ugv_roarm_description` 두 리포가 필요합니다. `
 
 > **전제 조건**: RPi에 Ubuntu 22.04 Server (arm64) + ROS 2 Humble 설치 완료, WSL2에 Ubuntu 22.04 + ROS 2 Humble 설치 완료
 
-**실행 순서와 상세 가이드는 [ugv_roarm_description README](https://github.com/fhekwn549/ugv_roarm_description#quick-start-실제-로봇-제어-wsl--rpi)를 참조하세요.**
+**실행 순서와 상세 가이드는 [ugv_roarm_description README](src/ugv_main/ugv_roarm_description/README.md)를 참조하세요.**
 
 ### RPi 초기 세팅 요약
 
@@ -69,7 +68,6 @@ ssh pi@192.168.0.71
 
 # 클론
 cd ~ && git clone -b ros2-humble-develop https://github.com/fhekwn549/ugv_ws.git
-cd ~/ugv_ws/src/ugv_main && git clone https://github.com/fhekwn549/ugv_roarm_description.git
 
 # 의존성
 pip3 install pyserial fastapi uvicorn paho-mqtt
@@ -98,7 +96,6 @@ source install/setup.bash
 ```bash
 # 클론
 cd ~ && git clone -b ros2-humble-develop https://github.com/fhekwn549/ugv_ws.git
-cd ~/ugv_ws/src/ugv_main && git clone https://github.com/fhekwn549/ugv_roarm_description.git
 
 # 의존성
 sudo apt install ros-humble-rmw-cyclonedds-cpp ros-humble-xacro \
@@ -183,13 +180,8 @@ Cartographer SLAM으로 전환하여 매핑 품질을 개선했습니다. Cartog
 cd ~/ugv_ws
 git add -A && git commit -m "설명" && git push origin ros2-humble-develop
 
-cd ~/ugv_ws/src/ugv_main/ugv_roarm_description
-git add -A && git commit -m "설명" && git push origin main
-
 # RPi: pull & build (SSH)
 cd ~/ugv_ws && git pull origin ros2-humble-develop
-cd src/ugv_main/ugv_roarm_description && git pull origin main
-cd ~/ugv_ws
 colcon build --packages-select ugv_bringup ugv_bridge rf2o_laser_odometry ugv_roarm_description
 source install/setup.bash
 ```

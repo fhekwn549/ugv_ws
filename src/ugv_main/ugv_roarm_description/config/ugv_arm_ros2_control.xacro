@@ -1,0 +1,54 @@
+<?xml version="1.0" ?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- ros2_control hardware interface for RoArm-M2 (4DOF) -->
+  <ros2_control name="GazeboArmSystem" type="system">
+    <hardware>
+      <plugin>gazebo_ros2_control/GazeboSystem</plugin>
+    </hardware>
+
+    <!-- Joint 1: Base rotation (Yaw) -->
+    <joint name="arm_base_link_to_arm_link1">
+      <command_interface name="position"/>
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <!-- Joint 2: Shoulder (Pitch) -->
+    <joint name="arm_link1_to_arm_link2">
+      <command_interface name="position"/>
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <!-- Joint 3: Elbow -->
+    <joint name="arm_link2_to_arm_link3">
+      <command_interface name="position"/>
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <!-- Joint 4: Gripper -->
+    <joint name="arm_link3_to_arm_gripper_link">
+      <command_interface name="position"/>
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity"/>
+    </joint>
+  </ros2_control>
+
+  <!-- Gazebo ros2_control plugin -->
+  <gazebo>
+    <plugin filename="libgazebo_ros2_control.so" name="gazebo_ros2_control">
+      <parameters>$(find ugv_roarm_description)/config/ugv_arm_controllers.yaml</parameters>
+    </plugin>
+  </gazebo>
+
+</robot>

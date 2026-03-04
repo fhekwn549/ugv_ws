@@ -1,0 +1,21 @@
+<CycloneDDS>
+  <Domain>
+    <General>
+      <Interfaces>
+        <NetworkInterface autodetermine="true" priority="default"/>
+      </Interfaces>
+      <MaxMessageSize>65000B</MaxMessageSize>
+      <FragmentSize>60000B</FragmentSize>
+    </General>
+    <Internal>
+      <DefragUnreliableMaxSamples>32</DefragUnreliableMaxSamples>
+    </Internal>
+    <Discovery>
+      <Peers>
+        <Peer address="localhost"/>
+      </Peers>
+      <ParticipantIndex>auto</ParticipantIndex>
+      <MaxAutoParticipantIndex>200</MaxAutoParticipantIndex>
+    </Discovery>
+  </Domain>
+</CycloneDDS>

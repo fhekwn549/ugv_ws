@@ -37,18 +37,9 @@ UGV RoArm 프로젝트의 업무 영역 정의와 담당자 배정 문서입니�
 | `ugv_bringup` | 전체 시스템 launch, CycloneDDS 설정 | **B** (HW & 자율주행) |
 | `ugv_description` | 기본 UGV URDF/Xacro | **B** (HW & 자율주행) |
 | `ugv_gazebo` | Gazebo 월드, 스폰 설정 | **B** (HW & 자율주행) |
+| `ugv_roarm_description` | RoArm URDF, Nav2/SLAM, nav_sim/Gazebo 시뮬레이션, ros2_control | **B** (HW & 자율주행) |
 | `ugv_interface` | 커스텀 msg/srv/action 정의 | **공동** (변경 시 양팀 합의) |
 | `ugv_tools` | 유틸리티 스크립트, 도구 | **공동** |
-
-### ugv_roarm_description (별도 리포)
-
-| 영역 | 담당 팀 |
-|------|---------|
-| URDF/Xacro 모델링 | **B** (HW & 자율주행) |
-| Nav2/SLAM 파라미터 | **B** (HW & 자율주행) |
-| nav_sim 경량 시뮬레이션 (fake_odom, fake_scan) | **B** (HW & 자율주행) |
-| Gazebo 시뮬레이션 | **B** (HW & 자율주행) |
-| 로봇팔 ros2_control | **B** (HW & 자율주행) |
 
 ### ugv_dashboard (별도 리포)
 
@@ -66,8 +57,7 @@ UGV RoArm 프로젝트의 업무 영역 정의와 담당자 배정 문서입니�
 
 | 리포 | 주 담당 팀 | 비고 |
 |------|-----------|------|
-| `ugv_ws` | 경로별로 A 또는 B | CODEOWNERS에 패키지별 팀 지정 |
-| `ugv_roarm_description` | **B** | 전체 B팀 관할 |
+| `ugv_ws` | 경로별로 A 또는 B | CODEOWNERS에 패키지별 팀 지정 (ugv_roarm_description 포함) |
 | `ugv_dashboard` | **A** | 전체 A팀 관할 |
 
 ---
@@ -81,6 +71,7 @@ ugv_vision                     ugv_base_node
 ugv_web_app                    ugv_nav / ugv_slam
 ugv_dashboard                  ugv_bringup
         │                      ugv_roarm_description
+        │                      ugv_description
         │                              │
         └──── ugv_bridge ──────────────┘
               (공동 관할)
