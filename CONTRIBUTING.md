@@ -175,10 +175,10 @@ ros2 launch ugv_bringup bringup_launch.py
 
 ## PR 작성 가이드
 
-1. **브랜치 생성**: `develop`에서 `feature/<이슈번호>-<설명>` 브랜치 생성
+1. **브랜치 생성**: 기본 브랜치(`ros2-humble-develop`)에서 `<이름>/<설명>` 브랜치 생성
 2. **작업 수행**: 변경사항 커밋 (Conventional Commits 형식, 영어)
 3. **빌드 확인**: `colcon build`가 성공하는지 확인
-4. **PR 생성**: GitHub에서 `develop` 브랜치로 PR 생성
+4. **PR 생성**: GitHub에서 기본 브랜치로 PR 생성
 5. **PR 본문**: 변경 사항, 테스트 방법, 관련 이슈를 기재
 
 ---
