@@ -14,7 +14,7 @@
 |------|------|------|
 | **이 리포 (`ugv_ws`)** | 하드웨어 구동 + 웹 브릿지 | 시리얼 드라이버, 센서 처리, MQTT/REST 브릿지 |
 | [ugv_roarm_description](https://github.com/fhekwn549/ugv_roarm_description) | 로봇 정의 + 실행 구성 | URDF, launch, Gazebo 시뮬레이션, 텔레옵, Nav2 |
-| [ugv_dashboard](https://github.com/fhekwn549/ugv_dashboard) | 웹 대시보드 프론트엔드 | Vue 3 + MQTT.js, 맵/LiDAR 시각화, 원격 제어 |
+| [ugv_dashboard](https://github.com/fhekwn549/ugv_dashboard) | 웹 대시보드 프론트엔드 | Vue 3 + STOMP/WebSocket, 맵/LiDAR 시각화, 원격 제어 |
 
 RPi에서는 `ugv_ws` + `ugv_roarm_description` 두 리포가 필요합니다. `ugv_roarm_description`의 `rasp_bringup.launch.py`가 이 리포의 드라이버 노드들을 실행합니다. 웹 대시보드는 `ugv_bridge`의 FastAPI가 정적 파일을 서빙합니다.
 
@@ -31,18 +31,20 @@ RPi에서는 `ugv_ws` + `ugv_roarm_description` 두 리포가 필요합니다. `
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  웹 브라우저 (ugv_dashboard)                                │
-│  Vue 3 + MQTT.js + Canvas                                   │
+│  Vue 3 + @stomp/stompjs + Canvas                            │
 │  맵 시각화 / LiDAR 2D / 원격 제어 / Nav2 목표 전송          │
 └──────────┬──────────────────────┬───────────────────────────┘
-           │ MQTT (1884/ws)       │ REST API (8080)
-┌──────────▼──────────────────────▼───────────────────────────┐
-│  ugv_bridge (이 리포)                                       │
+           │ STOMP/WS (15674)     │ REST API (8080)
+           │                      │        ┌── MES/ERP (STOMP:61613, 향후)
+┌──────────▼──────────────────────▼────────▼──────────────────┐
+│  ugv_bridge (이 리포) + RabbitMQ                            │
 │  FastAPI + paho-mqtt + SQLite                               │
 │  ROS 2 ↔ MQTT/REST 브릿지                                  │
 │  - 실시간: pose, map_pose, joints, scan, voltage → MQTT     │
 │  - 제어: navigate, cmd_vel, arm, gripper ← REST API         │
 │  - 맵: OccupancyGrid → PNG 변환                            │
 │  - 로깅: SQLite (commands, nav, events)                     │
+│  - RabbitMQ: MQTT:1883 + STOMP:61613 + Web STOMP:15674     │
 └──────────┬──────────────────────────────────────────────────┘
            │ CycloneDDS (ROS 2 토픽)
 ┌──────────▼──────────────────────────────────────────────────┐
@@ -73,7 +75,11 @@ cd ~/ugv_ws/src/ugv_main && git clone https://github.com/fhekwn549/ugv_roarm_des
 pip3 install pyserial fastapi uvicorn paho-mqtt
 sudo apt install ros-humble-rmw-cyclonedds-cpp ros-humble-xacro \
   ros-humble-robot-state-publisher ros-humble-joint-state-publisher \
-  mosquitto
+  rabbitmq-server
+# RabbitMQ 플러그인 활성화
+sudo cp ~/ugv_ws/src/ugv_main/ugv_bridge/config/enabled_plugins /etc/rabbitmq/enabled_plugins
+sudo cp ~/ugv_ws/src/ugv_main/ugv_bridge/config/rabbitmq.conf /etc/rabbitmq/rabbitmq.conf
+sudo systemctl restart rabbitmq-server
 
 # 스왑 추가 (RPi RAM 1GB인 경우, rf2o C++ 빌드 OOM 방지)
 sudo fallocate -l 2G /swapfile
@@ -139,7 +145,9 @@ ROS 2 토픽을 MQTT/REST API로 변환하여 웹 대시보드와 연동하는 �
 | `db_writer.py` | SQLite 로깅 (명령, 네비게이션, 이벤트) |
 | `map_converter.py` | OccupancyGrid → PNG 변환 (순수 stdlib, Pillow 불필요) |
 
-- **MQTT 브로커**: Mosquitto (1883 native, 1884 WebSocket)
+- **메시지 브로커**: RabbitMQ (MQTT:1883, STOMP:61613, Web STOMP:15674, Management:15672)
+  - Bridge(paho-mqtt) → MQTT:1883, Dashboard(@stomp/stompjs) → Web STOMP:15674
+  - MES/ERP → STOMP:61613 (향후)
 - **REST API**: FastAPI on port 8080 (정적 파일 서빙 포함)
 - **DB**: SQLite WAL 모드 (`~/ugv_bridge.db`)
 - **멀티 로봇**: `robot_id` 파라미터로 MQTT 네임스페이스 분리 (default: `ugv01`)

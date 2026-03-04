@@ -13,8 +13,11 @@ setup(
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch',
             ['launch/bridge.launch.py']),
-        ('share/' + package_name + '/config',
-            ['config/bridge_params.yaml']),
+        ('share/' + package_name + '/config', [
+            'config/bridge_params.yaml',
+            'config/rabbitmq.conf',
+            'config/enabled_plugins',
+        ]),
     ],
     install_requires=[
         'setuptools',

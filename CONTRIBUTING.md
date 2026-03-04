@@ -91,8 +91,31 @@ ros2 launch ugv_bridge ugv_bridge_launch.py
 ### 개발 시 주의사항
 
 - FastAPI 엔드포인트 추가 시 ROS 2 토픽/서비스와의 매핑을 명확히 문서화
-- WebSocket 연결은 MQTT 브로커를 통해 처리
+- 실시간 메시징은 RabbitMQ를 통해 처리 (Bridge: MQTT:1883, Dashboard: STOMP/WS:15674)
 - 새 API 엔드포인트 추가 시 `ugv_dashboard`의 해당 호출부도 함께 업데이트
+
+### RabbitMQ 설정
+
+브로커가 Mosquitto에서 RabbitMQ로 전환되었습니다. Bridge(paho-mqtt)는 MQTT 포트 1883을 그대로 사용하고, Dashboard는 STOMP over WebSocket(15674)을 사용합니다.
+
+```bash
+# RabbitMQ 설치 및 설정 배포
+sudo apt install rabbitmq-server
+sudo cp config/rabbitmq.conf /etc/rabbitmq/rabbitmq.conf
+sudo cp config/enabled_plugins /etc/rabbitmq/enabled_plugins
+sudo systemctl restart rabbitmq-server
+
+# 상태 확인
+sudo rabbitmqctl status
+# Management UI: http://localhost:15672 (guest/guest)
+```
+
+| 포트 | 프로토콜 | 용도 |
+|------|----------|------|
+| 1883 | MQTT | Bridge (paho-mqtt) |
+| 61613 | STOMP | MES/ERP (향후) |
+| 15674 | Web STOMP (WS) | Dashboard (@stomp/stompjs) |
+| 15672 | HTTP | Management UI |
 
 ---
 

@@ -94,7 +94,7 @@ ugv_dashboard                  ugv_bringup
 |-----------|----------|
 | `ugv_bridge` | 변경하는 팀이 PR 생성, **상대 팀에서 반드시 리뷰** |
 | `ugv_interface` (msg/srv) | 양팀 합의 후 변경, **양팀 각 1명 리뷰 필수** |
-| MQTT 토픽 추가/변경 | `ugv_bridge` + `ugv_dashboard` 동시 PR, 상호 링크 |
+| MQTT/STOMP 토픽 추가/변경 | `ugv_bridge` + `ugv_dashboard` 동시 PR, 상호 링크 |
 | API 엔드포인트 추가/변경 | `ugv_bridge` + `ugv_dashboard` 동시 PR, 상호 링크 |
 
 ---

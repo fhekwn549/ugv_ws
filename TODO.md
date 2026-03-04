@@ -38,6 +38,12 @@
 - [x] 웹 네비게이션 시각화 — 목표 마커, Shift+드래그 방향 지정, 경로 오버레이, 상태 패널
 - [x] nav_status 주기적 발행 (navigating 중 1Hz) + path 스팸 수정
 
+### 메시지 브로커 마이그레이션
+- [x] Mosquitto → RabbitMQ 전환 (MQTT + STOMP + Web STOMP 동시 지원)
+- [x] RabbitMQ 설정 파일 추가 (rabbitmq.conf, enabled_plugins)
+- [x] Dashboard: MQTT.js → @stomp/stompjs 전환 (useStomp.js + shim)
+- [x] STOMP 토픽 자동 변환 (ugv01/pose → /topic/ugv01.pose)
+
 ### Gazebo 시뮬레이션 (디지털 트윈)
 - [x] SLAM 맵 → Gazebo 월드 변환 스크립트 (map_to_gazebo_world.py)
 - [x] Gazebo + Nav2 통합 런치 (gazebo_nav.launch.py)
@@ -114,4 +120,4 @@
 |------|------|--------|
 | [ugv_roarm_description](https://github.com/fhekwn549/ugv_roarm_description) | URDF, launch, 텔레옵, SLAM, Nav2, Gazebo 시뮬레이션 | `main` |
 | [ugv_ws](https://github.com/fhekwn549/ugv_ws) | 하드웨어 드라이버 + ugv_bridge (MQTT/REST 브릿지) | `ros2-humble-develop` |
-| [ugv_dashboard](https://github.com/fhekwn549/ugv_dashboard) | 웹 대시보드 (Vue 3 + MQTT.js) | `main` |
+| [ugv_dashboard](https://github.com/fhekwn549/ugv_dashboard) | 웹 대시보드 (Vue 3 + STOMP/WS) | `main` |
