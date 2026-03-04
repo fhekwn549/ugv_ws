@@ -1,0 +1,40 @@
+# UGV RoArm 프로젝트 - 코드 오너십
+# 팀원이 확정되면 @TBD-vision-ui, @TBD-hw-nav를 실제 GitHub 팀/사용자명으로 교체하세요.
+#
+# 사용법:
+#   1. GitHub 리포 Settings → Teams에서 팀 생성
+#      - vision-ui-team: 비전 & UI 팀원들
+#      - hw-nav-team: HW 제어 & 자율주행 팀원들
+#   2. 아래 @org/team-name 또는 @username 으로 교체
+#
+# 참고: CODEOWNERS는 Branch Protection에서 "Require review from Code Owners"를
+#       활성화해야 동작합니다.
+
+# ============================================
+# Team A: 비전 & UI
+# ============================================
+src/ugv_main/ugv_vision/        @TBD-vision-ui
+src/ugv_main/ugv_web_app/       @TBD-vision-ui
+
+# ============================================
+# Team B: HW 제어 & 자율주행
+# ============================================
+src/ugv_main/ugv_base_node/     @TBD-hw-nav
+src/ugv_main/ugv_nav/           @TBD-hw-nav
+src/ugv_main/ugv_slam/          @TBD-hw-nav
+src/ugv_main/ugv_bringup/       @TBD-hw-nav
+src/ugv_main/ugv_description/   @TBD-hw-nav
+src/ugv_main/ugv_gazebo/        @TBD-hw-nav
+
+# ============================================
+# 공동 관할 (양팀 리뷰 필요)
+# ============================================
+src/ugv_main/ugv_bridge/        @TBD-vision-ui @TBD-hw-nav
+src/ugv_main/ugv_interface/     @TBD-vision-ui @TBD-hw-nav
+src/ugv_main/ugv_tools/         @TBD-vision-ui @TBD-hw-nav
+
+# ============================================
+# 프로젝트 문서 (전체)
+# ============================================
+*.md                            @TBD-vision-ui @TBD-hw-nav
+.github/                        @TBD-vision-ui @TBD-hw-nav
