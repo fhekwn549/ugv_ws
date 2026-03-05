@@ -70,8 +70,8 @@ class FakeOdomNode(Node):
 
         initialpose_qos = QoSProfile(
             reliability=ReliabilityPolicy.RELIABLE,
-            durability=DurabilityPolicy.TRANSIENT_LOCAL,
-            depth=1,
+            durability=DurabilityPolicy.VOLATILE,
+            depth=5,
         )
         self.create_subscription(
             PoseWithCovarianceStamped, 'initialpose',

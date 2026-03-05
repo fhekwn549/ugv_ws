@@ -41,6 +41,9 @@ class FakeScanNode(Node):
         self.declare_parameter('noise_stddev', 0.01)
         self.declare_parameter('scan_frame', 'base_lidar_link')
         self.declare_parameter('occupancy_threshold', 50)
+        self.declare_parameter('enable_angle_crop', True)
+        self.declare_parameter('angle_crop_min', 30.0)   # degrees
+        self.declare_parameter('angle_crop_max', 149.0)   # degrees
 
         self.num_samples = self.get_parameter('num_samples').value
         self.range_min = self.get_parameter('range_min').value
@@ -48,6 +51,11 @@ class FakeScanNode(Node):
         self.noise_stddev = self.get_parameter('noise_stddev').value
         self.scan_frame = self.get_parameter('scan_frame').value
         self.occ_thresh = self.get_parameter('occupancy_threshold').value
+        self.enable_angle_crop = self.get_parameter('enable_angle_crop').value
+        self.angle_crop_min_rad = math.radians(
+            self.get_parameter('angle_crop_min').value)
+        self.angle_crop_max_rad = math.radians(
+            self.get_parameter('angle_crop_max').value)
 
         # Map storage
         self.map_data = None       # 2D numpy array of occupancy values
@@ -63,6 +71,15 @@ class FakeScanNode(Node):
         self.angle_increment = (self.angle_max - self.angle_min) / self.num_samples
         self.angles = np.linspace(
             self.angle_min, self.angle_max, self.num_samples, endpoint=False)
+
+        # Pre-compute angle crop mask (robot arm blockage)
+        if self.enable_angle_crop:
+            self.crop_mask = ((self.angles >= self.angle_crop_min_rad) &
+                              (self.angles <= self.angle_crop_max_rad))
+            self.active_mask = ~self.crop_mask
+        else:
+            self.crop_mask = np.zeros(self.num_samples, dtype=bool)
+            self.active_mask = np.ones(self.num_samples, dtype=bool)
 
         # TF — spin_thread=True: TF 콜백이 별도 스레드에서 처리됨
         # → 타이머 콜백이 TF 업데이트를 블로킹하지 않음
@@ -144,13 +161,14 @@ class FakeScanNode(Node):
             self._last_log_x = robot_x
             self._last_log_y = robot_y
 
-        # Vectorized raycasting — all 360 rays processed simultaneously
+        # Vectorized raycasting — only active rays (skip cropped region)
         world_angles = robot_yaw + self.angles
         cos_a = np.cos(world_angles)
         sin_a = np.sin(world_angles)
 
         ranges = np.full(self.num_samples, self.range_max, dtype=np.float64)
-        active = np.ones(self.num_samples, dtype=bool)
+        ranges[self.crop_mask] = float('nan')
+        active = self.active_mask.copy()
         step = self.map_resolution * 0.5
 
         d = self.range_min
