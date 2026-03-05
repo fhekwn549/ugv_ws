@@ -10,7 +10,7 @@ Waveshare UGV Rover (4WD skid-steer) 위에 RoArm-M2 (4-DOF + gripper) 로봇팔
 |------|------|------|
 | **이 리포 (`ugv_roarm_description`)** | 로봇 정의 + 실행 구성 | URDF, launch, Gazebo 시뮬레이션, 텔레옵, Nav2 |
 | [fhekwn549/ugv_ws](https://github.com/fhekwn549/ugv_ws) | 하드웨어 구동 + 웹 브릿지 | 시리얼 드라이버, 센서 처리, MQTT/REST 브릿지 (`ugv_bridge`) |
-| [fhekwn549/ugv_dashboard](https://github.com/fhekwn549/ugv_dashboard) | 웹 대시보드 프론트엔드 | Vue 3 + MQTT.js, 맵/LiDAR 시각화, 원격 제어 |
+| [fhekwn549/ugv_dashboard](https://github.com/fhekwn549/ugv_dashboard) | 웹 대시보드 프론트엔드 | Vue 3 + Vuetify + STOMP, 맵/LiDAR 시각화, 원격 제어, 공장 관리 |
 
 RPi에서는 `ugv_roarm_description` + `ugv_ws` 두 리포가 필요합니다. 이 리포의 `rasp_bringup.launch.py`가 `ugv_ws`의 드라이버 노드들과 `ugv_bridge`를 실행합니다. 웹 대시보드(`ugv_dashboard`)는 별도로 빌드하여 `ugv_bridge`의 FastAPI가 정적 파일을 서빙합니다.
 
@@ -471,10 +471,14 @@ ros2 launch ugv_roarm_description nav_sim.launch.py use_bridge:=true
 **구성:**
 - `fake_odom_node` — `/cmd_vel` → 2D 운동학 적분 → `/odom` + TF (map→odom→base_footprint)
 - `fake_scan_node` — 맵 레이캐스팅 → `/scan` + `/dev/shm` (bridge용)
+  - LiDAR angle crop (30°~149°): 실제 LD19 LiDAR에서 로봇팔에 가려지는 영역을 시뮬레이션
 - Nav2 stack — planner, controller, behavior, bt_navigator
 - `use_sim_time: false` — 벽시계 사용
+- `yaw_goal_tolerance: 0.15 rad` — 목적지 도착 시 지정 방향으로 회전
 
 > **WSL2 LiDAR 전달 이슈:** CycloneDDS가 WSL2에서 RELIABLE LaserScan을 간헐적으로 전달하지 못하는 문제가 있어, fake_scan_node가 `/dev/shm/ugv_scan.json`에 scan 데이터를 직접 쓰고 bridge가 이를 읽습니다. 실제 로봇에서는 DDS 구독으로 자동 fallback됩니다.
+
+> **LiDAR Angle Crop:** 실제 로봇은 LiDAR(LD19) 후방에 로봇팔(RoArm-M2)이 위치하여 30°~149° 범위의 readings이 차단됩니다. fake_scan_node와 rasp_bringup의 LD19 드라이버 모두 이 범위를 NaN으로 처리합니다.
 
 ---
 
@@ -564,7 +568,7 @@ ugv_roarm_description/
 ├── scripts/
 │   ├── teleop_all.py              # 통합 키보드 텔레옵 노드
 │   ├── fake_odom_node.py          # 가상 오도메트리 노드 (nav_sim용)
-│   ├── fake_scan_node.py          # 가상 LiDAR 스캔 노드 (nav_sim용)
+│   ├── fake_scan_node.py          # 가상 LiDAR 스캔 노드 (nav_sim용, angle crop 30°~149°)
 │   ├── sim_pose_bridge.py         # RViz 2D Pose Estimate → Gazebo 텔레포트
 │   └── map_to_gazebo_world.py     # SLAM 맵 → Gazebo 월드 변환 스크립트
 ├── config/
@@ -574,7 +578,7 @@ ugv_roarm_description/
 │   ├── slam_toolbox.yaml              # SLAM 파라미터 (레거시, 롤백용)
 │   ├── nav2_params.yaml               # Nav2 자율주행 파라미터 (실제 로봇)
 │   ├── nav2_params_sim.yaml           # Nav2 자율주행 파라미터 (Gazebo 시뮬레이션)
-│   └── nav2_params_fake.yaml          # Nav2 자율주행 파라미터 (경량 시뮬레이션)
+│   └── nav2_params_fake.yaml          # Nav2 자율주행 파라미터 (경량 시뮬레이션, yaw_goal_tolerance=0.15)
 ├── rviz/
 │   ├── view_ugv_roarm.rviz        # 기본 RViz 설정
 │   ├── remote_view.rviz           # 원격 제어용 RViz 설정
@@ -682,3 +686,6 @@ LiDAR 스캔 매칭 기반 오도메트리. Wave Rover는 인코더가 없으므
 | RViz에서 맵이 안 보임 (Nav2) | Map 토픽 QoS 불일치 | RViz Map display의 Durability Policy를 `Transient Local`로 설정 |
 | Nav2 Goal 후 로봇이 안 움직임 | 모터 데드밴드보다 낮은 속도 명령 | `nav2_params.yaml`에서 `min_vel_x`, `min_speed_xy` 증가 (0.05 이상) |
 | Nav2 회전 후 AMCL 위치 틀어짐 | rf2o odom drift + AMCL 업데이트 느림 | `update_min_a: 0.05`, `alpha1/2/4: 0.5`로 설정, 파티클 수 증가 |
+| Nav2 목적지 도착 후 방향 안 맞춤 | `yaw_goal_tolerance`가 6.28 (360°) | `nav2_params_fake.yaml`에서 `yaw_goal_tolerance: 0.15` (약 8.6°)로 설정 |
+| WSL2 대시보드 LiDAR 안 보임 | CycloneDDS 크로스 프로세스 전달 실패 | `use_bridge:=true`로 실행, fake_scan_node가 `/dev/shm`에 직접 쓰고 bridge가 폴링 |
+| 이전 세션 좀비 프로세스로 로봇 진동 | 이전 fake_odom_node/bridge_node 미종료 | `ps aux \| grep fake_odom`으로 확인 후 kill, 재시작 |
