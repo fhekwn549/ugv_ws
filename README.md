@@ -27,6 +27,12 @@ RPi에서는 `ugv_ws` 하나만 클론하면 됩니다. `ugv_roarm_description`�
 | `/dev/ttyUSB0` | RoArm-M2 ESP32 | `roarm_driver` |
 | `/dev/ttyUSB1` | LDLidar (STL-19P) | `ldlidar_ros2` |
 
+### LiDAR 설정
+
+- **Angle Crop**: 210°~329° 영역 제거 (로봇팔이 가리는 후방 영역)
+- 유효 시야: 약 240° (자율주행에 충분)
+- 설정 위치: `rasp_bringup.launch.py`의 `angle_crop_min/max` 파라미터
+
 ### 시스템 아키텍처
 
 ```
@@ -35,7 +41,7 @@ RPi에서는 `ugv_ws` 하나만 클론하면 됩니다. `ugv_roarm_description`�
 │  Vue 3 + @stomp/stompjs + Canvas                            │
 │  맵 시각화 / LiDAR 2D / 원격 제어 / Nav2 목표 전송          │
 └──────────┬──────────────────────┬───────────────────────────┘
-           │ STOMP/WS (15674)     │ REST API (8080)
+           │ STOMP/WS (15674)     │ REST API (8081)
            │                      │        ┌── MES/ERP (STOMP:61613, 향후)
 ┌──────────▼──────────────────────▼────────▼──────────────────┐
 │  ugv_bridge (이 리포) + RabbitMQ                            │
@@ -110,7 +116,26 @@ colcon build --packages-select ugv_bringup ugv_roarm_description ugv_description
 source install/setup.bash
 ```
 
-### 매번 실행 (터미널 3개)
+### 매번 실행
+
+#### 방법 A: 웹 대시보드로 제어 (권장)
+
+```bash
+# [터미널 1: RPi SSH] 하드웨어 드라이버 + ugv_bridge
+ssh pi@192.168.0.71
+source ~/ugv_ws/install/setup.bash
+ros2 launch ugv_roarm_description rasp_bringup.launch.py
+
+# [터미널 2: RPi SSH] 자율주행 (SLAM 맵 필요 시)
+source ~/ugv_ws/install/setup.bash
+ros2 launch ugv_roarm_description nav_real.launch.py pbstream:=/home/pi/maps/lab_map.pbstream
+
+# [터미널 3: WSL] 웹 대시보드
+cd ~/ugv_dashboard && npm run dev
+# → 브라우저에서 ws://192.168.0.71:15674/ws 로 Connect
+```
+
+#### 방법 B: RViz로 시각화 (CycloneDDS 설정 필요)
 
 ```bash
 # [터미널 1: RPi SSH] 하드웨어 드라이버
@@ -126,6 +151,8 @@ ros2 launch ugv_roarm_description remote_view.launch.py
 source ~/ugv_ws/install/setup.bash
 ros2 run ugv_roarm_description teleop_all.py --ros-args -p mode:=rviz -p model:=rasp_rover
 ```
+
+> **참고**: WSL2는 기본적으로 NAT 모드라 DDS 멀티캐스트가 RPi까지 안 갑니다. 방법 B는 CycloneDDS unicast 설정이 필요합니다.
 
 ---
 
@@ -147,7 +174,7 @@ ROS 2 토픽을 MQTT/REST API로 변환하여 웹 대시보드와 연동하는 �
 - **메시지 브로커**: RabbitMQ (MQTT:1883, STOMP:61613, Web STOMP:15674, Management:15672)
   - Bridge(paho-mqtt) → MQTT:1883, Dashboard(@stomp/stompjs) → Web STOMP:15674
   - MES/ERP → STOMP:61613 (향후)
-- **REST API**: FastAPI on port 8080 (정적 파일 서빙 포함)
+- **REST API**: FastAPI on port 8081 (정적 파일 서빙 포함)
 - **DB**: SQLite WAL 모드 (`~/ugv_bridge.db`)
 - **멀티 로봇**: `robot_id` 파라미터로 MQTT 네임스페이스 분리 (default: `ugv01`)
 
