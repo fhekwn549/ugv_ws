@@ -120,14 +120,14 @@ controller_server:
       rotate_to_heading_angular_vel: 2.0
       max_angular_accel: 2.0
       simulate_ahead_time: 1.0
-      min_vel_x: 0.05
+      min_vel_x: 0.1
       min_vel_y: 0.0
       max_vel_x: 0.3
       max_vel_y: 0.0
       max_vel_theta: 2.0
-      min_speed_xy: 0.05
+      min_speed_xy: 0.1
       max_speed_xy: 0.3
-      min_speed_theta: 0.4
+      min_speed_theta: 0.5
       acc_lim_x: 1.5
       acc_lim_y: 0.0
       acc_lim_theta: 2.0
