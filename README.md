@@ -120,34 +120,42 @@ source install/setup.bash
 
 #### 방법 A: 웹 대시보드로 제어 (권장)
 
-```bash
-# [터미널 1: RPi SSH] 하드웨어 드라이버 + ugv_bridge
-ssh pi@192.168.0.71
-source ~/ugv_ws/install/setup.bash
-ros2 launch ugv_roarm_description rasp_bringup.launch.py
+RPi 전원을 켜면 `ugv_bringup.service`(systemd)가 자동으로 `rasp_bringup.launch.py`를 실행합니다.
+별도의 SSH 접속 없이, WSL에서 대시보드만 실행하면 됩니다.
 
-# [터미널 2: RPi SSH] 자율주행 (SLAM 맵 필요 시)
+```bash
+# [WSL] 웹 대시보드
+cd ~/ugv_dashboard && npm run dev
+# → 브라우저에서 http://localhost:5173 접속
+# → .env의 VITE_ROBOT_HOST=192.168.0.71 확인
+```
+
+RPi bringup 서비스 관리 (SSH 접속 시):
+```bash
+# 상태 확인
+sudo systemctl status ugv_bringup.service
+
+# 재시작 (코드 수정 후 colcon build 이후)
+sudo systemctl restart ugv_bringup.service
+
+# 실시간 로그 확인
+journalctl -u ugv_bringup -f
+
+# 자율주행 (SLAM 맵 필요 시, 별도 터미널)
 source ~/ugv_ws/install/setup.bash
 ros2 launch ugv_roarm_description nav_real.launch.py pbstream:=/home/pi/maps/lab_map.pbstream
-
-# [터미널 3: WSL] 웹 대시보드
-cd ~/ugv_dashboard && npm run dev
-# → 브라우저에서 ws://192.168.0.71:15674/ws 로 Connect
 ```
 
 #### 방법 B: RViz로 시각화 (CycloneDDS 설정 필요)
 
 ```bash
-# [터미널 1: RPi SSH] 하드웨어 드라이버
-ssh pi@192.168.0.71
-source ~/ugv_ws/install/setup.bash
-ros2 launch ugv_roarm_description rasp_bringup.launch.py
+# RPi는 자동 실행 (ugv_bringup.service)
 
-# [터미널 2: WSL] RViz (CycloneDDS로 자동 수신)
+# [터미널 1: WSL] RViz (CycloneDDS로 자동 수신)
 source ~/ugv_ws/install/setup.bash
 ros2 launch ugv_roarm_description remote_view.launch.py
 
-# [터미널 3: WSL] 키보드 텔레옵
+# [터미널 2: WSL] 키보드 텔레옵
 source ~/ugv_ws/install/setup.bash
 ros2 run ugv_roarm_description teleop_all.py --ros-args -p mode:=rviz -p model:=rasp_rover
 ```
