@@ -29,7 +29,7 @@ class BridgeNode(Node):
         self.declare_parameter("mqtt_port", 1883)
         self.declare_parameter("mqtt_keepalive", 60)
         self.declare_parameter("api_host", "0.0.0.0")
-        self.declare_parameter("api_port", 8080)
+        self.declare_parameter("api_port", 8081)
         self.declare_parameter("db_path", "~/ugv_bridge.db")
         self.declare_parameter("static_dir", "")
         self.declare_parameter("pose_rate", 10.0)
