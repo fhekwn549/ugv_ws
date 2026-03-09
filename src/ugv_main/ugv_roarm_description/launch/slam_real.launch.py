@@ -1,20 +1,23 @@
 """
 Real Robot SLAM Launch File (Cartographer)
 
-RPi에서 rasp_bringup.launch.py 실행 후,
-WSL에서 이 launch 파일을 실행하면 Cartographer + RViz가 함께 뜹니다.
-CycloneDDS를 통해 RPi의 토픽(/scan, /odom, /tf 등)이 자동으로 수신됩니다.
+RPi 또는 WSL에서 실행 가능.
+RPi에서 실행 시: rasp_bringup과 같은 머신에서 토픽 직접 수신.
+WSL에서 실행 시: CycloneDDS를 통해 RPi 토픽 수신 + RViz 시각화.
 
 Ctrl+C 종료 시 ~/maps/ 에 pbstream + pgm/yaml 자동 저장.
 
 Usage:
   ros2 launch ugv_roarm_description slam_real.launch.py
+  ros2 launch ugv_roarm_description slam_real.launch.py use_rviz:=true  # WSL with RViz
 """
 
 import os
 from datetime import datetime
 from launch import LaunchDescription
-from launch.actions import ExecuteProcess
+from launch.actions import DeclareLaunchArgument, ExecuteProcess
+from launch.conditions import IfCondition
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
 
@@ -25,6 +28,8 @@ def generate_launch_description():
     cartographer_config_dir = os.path.join(pkg_dir, 'config')
     rviz_config = os.path.join(pkg_dir, 'rviz', 'slam_view.rviz')
 
+    use_rviz = LaunchConfiguration('use_rviz')
+
     # Auto-save map on shutdown
     map_dir = os.path.expanduser('~/maps')
     os.makedirs(map_dir, exist_ok=True)
@@ -33,6 +38,11 @@ def generate_launch_description():
     pbstream_path = f'{map_path}.pbstream'
 
     return LaunchDescription([
+        DeclareLaunchArgument(
+            'use_rviz',
+            default_value='false',
+            description='Launch RViz (set true on WSL, false on RPi)'),
+
         # Cartographer SLAM node
         Node(
             package='cartographer_ros',
@@ -63,14 +73,15 @@ def generate_launch_description():
             }],
         ),
 
-        # RViz2 with SLAM view (software rendering for WSL2)
+        # RViz2 (optional, for WSL only)
         Node(
             package='rviz2',
             executable='rviz2',
             name='rviz2',
             output='screen',
             arguments=['-d', rviz_config],
-            additional_env={'LIBGL_ALWAYS_SOFTWARE': '1'}
+            additional_env={'LIBGL_ALWAYS_SOFTWARE': '1'},
+            condition=IfCondition(use_rviz),
         ),
 
         # Map auto-saver: saves pbstream + pgm/yaml on Ctrl+C
