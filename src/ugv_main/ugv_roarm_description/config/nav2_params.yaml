@@ -117,17 +117,17 @@ controller_server:
       primary_controller: "dwb_core::DWBLocalPlanner"
       angular_dist_threshold: 0.785
       forward_sampling_distance: 0.5
-      rotate_to_heading_angular_vel: 0.8
+      rotate_to_heading_angular_vel: 0.4
       max_angular_accel: 0.2
       simulate_ahead_time: 1.0
       min_vel_x: 0.05
       min_vel_y: 0.0
       max_vel_x: 0.15
       max_vel_y: 0.0
-      max_vel_theta: 0.8
+      max_vel_theta: 0.4
       min_speed_xy: 0.05
       max_speed_xy: 0.15
-      min_speed_theta: 0.3
+      min_speed_theta: 0.15
       acc_lim_x: 0.05
       acc_lim_y: 0.0
       acc_lim_theta: 0.2
@@ -273,8 +273,8 @@ velocity_smoother:
     smoothing_frequency: 20.0
     scale_velocities: false
     feedback: "OPEN_LOOP"
-    max_velocity: [0.15, 0.0, 0.8]
-    min_velocity: [-0.15, 0.0, -0.8]
+    max_velocity: [0.15, 0.0, 0.4]
+    min_velocity: [-0.15, 0.0, -0.4]
     max_accel: [0.05, 0.0, 0.2]
     max_decel: [-0.05, 0.0, -0.2]
     odom_topic: "odom"
