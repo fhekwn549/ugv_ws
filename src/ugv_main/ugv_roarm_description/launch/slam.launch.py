@@ -78,6 +78,6 @@ def generate_launch_description():
             arguments=['-d', rviz_config],
             parameters=[{'use_sim_time': True}],
             condition=IfCondition(use_rviz),
-            # GPU rendering configured globally via ~/.bashrc
+            additional_env={'LIBGL_ALWAYS_SOFTWARE': '1'},
         ),
     ])

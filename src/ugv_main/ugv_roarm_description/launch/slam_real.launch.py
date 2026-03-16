@@ -80,7 +80,7 @@ def generate_launch_description():
             name='rviz2',
             output='screen',
             arguments=['-d', rviz_config],
-            # GPU rendering configured globally via ~/.bashrc
+            additional_env={'LIBGL_ALWAYS_SOFTWARE': '1'},
             condition=IfCondition(use_rviz),
         ),
 

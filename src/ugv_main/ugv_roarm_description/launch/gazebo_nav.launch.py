@@ -217,6 +217,10 @@ def generate_launch_description():
             arguments=['-d', rviz_config],
             parameters=[{'use_sim_time': use_sim_time}],
             condition=IfCondition(use_rviz),
-            # GPU rendering configured globally via ~/.bashrc
+            additional_env={
+                'DISPLAY': ':0',
+                'LIBGL_ALWAYS_SOFTWARE': '1',
+                'MESA_GL_VERSION_OVERRIDE': '3.3',
+            },
         ),
     ])
