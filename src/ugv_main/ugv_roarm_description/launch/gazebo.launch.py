@@ -95,12 +95,11 @@ def generate_launch_description():
             }.items(),
         ),
 
-        # Gazebo client (DISPLAY set only for this process, not gzserver)
+        # Gazebo client (GPU-accelerated via D3D12 on WSL2)
         ExecuteProcess(
             cmd=['gzclient', '--gui-client-plugin', 'libgazebo_ros_eol_gui.so'],
             output='screen',
             condition=IfCondition(gui),
-            additional_env={'DISPLAY': ':0', 'LIBGL_ALWAYS_SOFTWARE': '1'},
         ),
 
         # Robot State Publisher

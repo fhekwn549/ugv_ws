@@ -202,11 +202,7 @@ def generate_launch_description():
         arguments=['-d', rviz_config],
         parameters=[{'use_sim_time': False}],
         condition=IfCondition(use_rviz),
-        additional_env={
-            'DISPLAY': ':0',
-            'LIBGL_ALWAYS_SOFTWARE': '1',
-            'MESA_GL_VERSION_OVERRIDE': '3.3',
-        },
+        # GPU rendering configured globally via ~/.bashrc
     ))
 
     # ===== 10. ugv_bridge (optional: web dashboard backend) =====

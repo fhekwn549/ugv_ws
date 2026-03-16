@@ -285,10 +285,18 @@ rviz2
 
 ## 문제 해결
 
-### Gazebo가 WSL2에서 실행되지 않음
+### Gazebo GUI (WSL2 + Intel GPU)
 
-Gazebo GUI(`gzclient`)는 WSL2에서 D3D12 호환성 문제로 크래시할 수 있습니다.
-서버(`gzserver`)만 실행하고, RViz로 시각화하세요:
+`~/.bashrc`에 아래 환경변수가 설정되어 있으면 Gazebo GUI가 Intel GPU 가속으로 정상 작동합니다:
+
+```bash
+export MESA_D3D12_DEFAULT_ADAPTER_NAME=Intel
+export MESA_LOADER_DRIVER_OVERRIDE=d3d12
+export LIBGL_ALWAYS_SOFTWARE=0
+export MESA_GL_VERSION_OVERRIDE=4.5
+```
+
+GPU 설정이 안 된 환경에서는 GUI 없이 실행:
 
 ```bash
 ros2 launch ugv_roarm_description gazebo.launch.py gui:=false

@@ -73,7 +73,7 @@ def generate_launch_description():
             ]))
         ),
 
-        # RViz2 (software rendering for WSL2 compatibility)
+        # RViz2 (GPU rendering configured globally via ~/.bashrc)
         Node(
             package='rviz2',
             executable='rviz2',
@@ -81,6 +81,5 @@ def generate_launch_description():
             output='screen',
             arguments=['-d', rviz_config_file],
             condition=IfCondition(use_rviz),
-            additional_env={'LIBGL_ALWAYS_SOFTWARE': '1'}
         ),
     ])
