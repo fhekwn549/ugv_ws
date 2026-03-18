@@ -45,16 +45,15 @@ RPi에서는 `ugv_ws` 하나만 클론하면 됩니다. `ugv_roarm_description`�
 │  Vue 3 + @stomp/stompjs + Canvas                            │
 │  맵 시각화 / LiDAR 2D / 원격 제어 / Nav2 목표 전송          │
 └──────────┬──────────────────────┬───────────────────────────┘
-           │ STOMP/WS (15674)     │ REST API (8081)
-           │                      │        ┌── MES/ERP (STOMP:61613, 향후)
-┌──────────▼──────────────────────▼────────▼──────────────────┐
-│  ugv_bridge (이 리포) + RabbitMQ                            │
-│  FastAPI + paho-mqtt + SQLite                               │
-│  ROS 2 ↔ MQTT/REST 브릿지                                  │
-│  - 실시간: pose, map_pose, joints, scan, voltage → MQTT     │
-│  - 제어: navigate, cmd_vel, arm, gripper ← REST API         │
-│  - 맵: OccupancyGrid → PNG 변환                            │
-│  - 로깅: SQLite (commands, nav, events)                     │
+           │ STOMP/WS (15674)     │ REST (8081, 맵/로그만)
+           │ 제어: cmd_vel, arm,  │
+           │ gripper, navigate    │
+┌──────────▼──────────────────────▼───────────────────────────┐
+│  RPi: ugv_bridge + RabbitMQ                                 │
+│  paho-mqtt(MQTT 구독→ROS 2) + FastAPI(맵/로그 REST)        │
+│  - MQTT 구독: cmd_vel, arm, gripper, navigate, cancel       │
+│  - MQTT 발행: pose, map_pose, joints, scan, voltage         │
+│  - REST: 맵 PNG, 로그 조회 (읽기 전용)                      │
 │  - RabbitMQ: MQTT:1883 + STOMP:61613 + Web STOMP:15674     │
 └──────────┬──────────────────────────────────────────────────┘
            │ CycloneDDS (ROS 2 토픽)
@@ -178,17 +177,18 @@ ROS 2 토픽을 MQTT/REST API로 변환하여 웹 대시보드와 연동하는 �
 |------|------|
 | `bridge_node.py` | 메인 ROS 2 노드 |
 | `ros_interface.py` | ROS 2 토픽 구독/발행 + TF2 리스너 |
-| `mqtt_bridge.py` | MQTT 발행 (pose, map_pose, joints, scan, voltage, nav_status) |
-| `api_app.py` | FastAPI REST 엔드포인트 (navigate, cmd_vel, arm, gripper, map) |
+| `mqtt_bridge.py` | MQTT 발행 (센서) + MQTT 구독 (제어: cmd_vel, arm, gripper, navigate, cancel) |
+| `api_app.py` | FastAPI REST 엔드포인트 (맵 PNG, 로그 조회 — 읽기 전용) |
 | `db_writer.py` | SQLite 로깅 (명령, 네비게이션, 이벤트) |
 | `map_converter.py` | OccupancyGrid → PNG 변환 (순수 stdlib, Pillow 불필요) |
 
 - **메시지 브로커**: RabbitMQ (MQTT:1883, STOMP:61613, Web STOMP:15674, Management:15672)
   - Bridge(paho-mqtt) → MQTT:1883, Dashboard(@stomp/stompjs) → Web STOMP:15674
-  - MES/ERP → STOMP:61613 (향후)
-- **REST API**: FastAPI on port 8081 (정적 파일 서빙 포함)
+- **통신 방식**: 모든 로봇 제어(cmd_vel, arm, gripper, navigate, cancel)는 MQTT로 통일. REST API는 맵/로그 조회 전용 (읽기 전용)
+- **REST API**: FastAPI on port 8081 (맵 PNG, 로그 조회)
 - **DB**: SQLite WAL 모드 (`~/ugv_bridge.db`)
 - **멀티 로봇**: `robot_id` 파라미터로 MQTT 네임스페이스 분리 (default: `ugv01`)
+- **Factory API 불필요**: 로봇 제어는 MQTT로 직접 통신하므로 Factory API 프록시 없이 동작
 
 ### Added: `ugv_cpp_nodes` (C++ 실시간 시리얼 드라이버)
 
