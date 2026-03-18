@@ -21,11 +21,15 @@ RPi에서는 `ugv_ws` 하나만 클론하면 됩니다. `ugv_roarm_description`�
 
 ### 시리얼 포트 매핑 (RPi)
 
-| 포트 | 장치 | 드라이버 노드 |
-|------|------|--------------|
-| `/dev/ttyAMA0` | UGV 바퀴 ESP32 | `ugv_driver` |
-| `/dev/ttyUSB0` | RoArm-M2 ESP32 | `roarm_driver` |
-| `/dev/ttyUSB1` | LDLidar (STL-19P) | `ldlidar_ros2` |
+| 포트 | 장치 | 드라이버 노드 | 언어 | 패키지 |
+|------|------|--------------|------|--------|
+| `/dev/ttyAMA0` | UGV 바퀴 ESP32 | `ugv_driver_node` | **C++** | `ugv_cpp_nodes` |
+| `/dev/ttyUSB0` | RoArm-M2 ESP32 | `roarm_driver_node` | **C++** | `ugv_cpp_nodes` |
+| `/dev/ttyUSB1` | LDLidar (STL-19P) | `ldlidar_ros2_node` | C++ | `ldlidar_ros2` |
+
+> **C++ 드라이버 전환 (2026-03)**: 실시간 통신 성능 개선을 위해 `ugv_driver`와 `roarm_driver`를 Python에서 C++로 전환했습니다.
+> 기존 Python 드라이버(`ugv_bringup` 패키지)는 그대로 유지되므로, 필요 시 launch 파일에서 패키지명만 바꾸면 롤백 가능합니다.
+> 자세한 내용은 아래 [C++ 실시간 드라이버](#added-ugv_cpp_nodes-c-실시간-시리얼-드라이버) 섹션을 참고하세요.
 
 ### LiDAR 설정
 
@@ -56,7 +60,7 @@ RPi에서는 `ugv_ws` 하나만 클론하면 됩니다. `ugv_roarm_description`�
            │ CycloneDDS (ROS 2 토픽)
 ┌──────────▼──────────────────────────────────────────────────┐
 │  RPi ROS 2 노드                                            │
-│  ugv_driver + roarm_driver + ldlidar + rf2o_laser_odometry  │
+│  ugv_driver(C++) + roarm_driver(C++) + ldlidar + rf2o_odom  │
 │  Cartographer (SLAM/localization) + Nav2                    │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -94,7 +98,7 @@ echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 
 # 빌드
 cd ~/ugv_ws && source /opt/ros/humble/setup.bash
-colcon build --packages-select ugv_bringup ugv_bridge ugv_roarm_description \
+colcon build --packages-select ugv_bringup ugv_cpp_nodes ugv_bridge ugv_roarm_description \
   ugv_description rf2o_laser_odometry ugv_interface ldlidar
 source install/setup.bash
 ```
@@ -112,7 +116,7 @@ sudo apt install ros-humble-rmw-cyclonedds-cpp ros-humble-xacro \
 
 # 빌드
 cd ~/ugv_ws && source /opt/ros/humble/setup.bash
-colcon build --packages-select ugv_bringup ugv_roarm_description ugv_description
+colcon build --packages-select ugv_bringup ugv_cpp_nodes ugv_roarm_description ugv_description
 source install/setup.bash
 ```
 
@@ -186,9 +190,105 @@ ROS 2 토픽을 MQTT/REST API로 변환하여 웹 대시보드와 연동하는 �
 - **DB**: SQLite WAL 모드 (`~/ugv_bridge.db`)
 - **멀티 로봇**: `robot_id` 파라미터로 MQTT 네임스페이스 분리 (default: `ugv01`)
 
-### Added: `roarm_driver` (in `ugv_bringup`)
+### Added: `ugv_cpp_nodes` (C++ 실시간 시리얼 드라이버)
 
-RoArm-M2 로봇팔을 시리얼(`/dev/ttyUSB0`)로 제어하는 ROS 2 드라이버 노드.
+실시간 통신 성능 개선을 위해 `ugv_driver`와 `roarm_driver`를 Python에서 C++로 전환한 패키지입니다.
+기존 Python 드라이버(`ugv_bringup` 패키지)의 토픽/파라미터를 1:1 유지하여, ROS 2 네트워크 관점에서 동일하게 동작합니다.
+
+#### 왜 C++로 전환했는가?
+
+이 두 노드는 **시리얼 포트를 통해 ESP32 모터 컨트롤러와 직접 통신**하는 하드웨어 드라이버입니다.
+`/cmd_vel`이 들어오면 즉시 바퀴가 반응해야 하고, 로봇팔 피드백도 주기적으로 읽어야 합니다.
+Python의 GIL(Global Interpreter Lock)과 가비지 컬렉션이 이 실시간성을 방해할 수 있어 C++로 전환했습니다.
+
+| 항목 | Python (기존) | C++ (현재) | 개선 |
+|------|--------------|-----------|------|
+| 시리얼 I/O | pyserial + GIL 경합 | POSIX termios 직접 제어 | GIL 없는 진정한 멀티스레딩 |
+| JSON 직렬화 | `json.dumps()` 매 콜백 | `snprintf` 사전 포맷팅 | 힙 할당 최소화 |
+| 스레드 안전 | `threading.Lock` + GIL | `std::mutex` | 예측 가능한 타이밍 |
+| GC 영향 | 있음 (간헐적 지연) | 없음 | 일정한 반응 시간 |
+
+반면, `ugv_bridge`(MQTT/REST), `fake_odom_node`(시뮬레이션), `teleop_all`(키보드 입력) 등은
+네트워크 I/O 바운드이거나 사람 입력 속도에 맞추면 되므로 Python으로 충분합니다.
+
+#### 아키텍처 (3계층 분리)
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ ROS2 노드 계층 (roarm_driver_node, ugv_driver_node)     │
+│  - 토픽 구독/발행, 파라미터, 타이머                      │
+│  - rclcpp에 의존                                        │
+└──────────────────────┬──────────────────────────────────┘
+                       │ 사용
+┌──────────────────────▼──────────────────────────────────┐
+│ 프로토콜 드라이버 계층 (roarm_serial_driver, ugv_serial_driver) │
+│  - ESP32 JSON 프로토콜 (T:102, T:105, T:106, T:13 등)  │
+│  - 에코 처리, JSON 파싱, 뮤텍스                         │
+│  - ROS2 의존성 없음 (순수 C++ 정적 라이브러리)          │
+└──────────────────────┬──────────────────────────────────┘
+                       │ 사용
+┌──────────────────────▼──────────────────────────────────┐
+│ 시리얼 포트 계층 (serial_driver)                         │
+│  - POSIX termios, select(), 타임아웃                     │
+│  - ROS2 의존성 없음 (순수 C++ 정적 라이브러리)          │
+└─────────────────────────────────────────────────────────┘
+```
+
+#### 패키지 파일 구조
+
+```
+src/ugv_main/ugv_cpp_nodes/
+├── CMakeLists.txt                              # 빌드 설정 (정적 라이브러리 + 실행 파일)
+├── package.xml                                 # ROS2 패키지 매니페스트
+├── include/ugv_cpp_nodes/
+│   ├── serial_driver.hpp                       # POSIX 시리얼 포트 드라이버
+│   ├── roarm_serial_driver.hpp                 # RoArm-M2 ESP32 프로토콜
+│   └── ugv_serial_driver.hpp                   # UGV 바퀴 ESP32 프로토콜
+└── src/
+    ├── serial_driver.cpp                       # termios 시리얼 통신 구현
+    ├── roarm_serial_driver.cpp                 # T:102/105/106/210 명령/응답
+    ├── ugv_serial_driver.cpp                   # T:13/132/134 명령 (write-only)
+    ├── roarm_driver_node.cpp                   # ROS2 노드: /joint_states 발행
+    └── ugv_driver_node.cpp                     # ROS2 노드: /cmd_vel 수신
+```
+
+#### roarm_driver_node (RoArm-M2 로봇팔)
+
+- **Subscribe**: `/arm_controller/joint_trajectory` (JointTrajectory) → T:102 관절 이동
+- **Subscribe**: `/roarm/gripper_cmd` (Float64) → T:106 그리퍼 제어
+- **Publish**: `/joint_states` (JointState) ← T:105 주기적 피드백 (5Hz)
+- **Parameters**: `serial_port` (`/dev/ttyUSB0`), `baud_rate` (115200), `feedback_rate` (5.0)
+- 팔 관절 이동 시 그리퍼 토크 유지 (T:102에 항상 `hand` 값 포함)
+- 바퀴 관절 (인코더 없음)은 0.0으로 발행 → TF 트리 완성
+
+#### ugv_driver_node (UGV 바퀴/팬틸트/LED)
+
+- **Subscribe**: `cmd_vel` (Twist) → T:13 모터 속도
+- **Subscribe**: `ugv/joint_states` (JointState) → T:134 팬틸트 (rad→deg 변환)
+- **Subscribe**: `ugv/led_ctrl` (Float32MultiArray) → T:132 LED
+- **Subscribe**: `voltage` (Float32) → 저전압 경고 로그
+- **Parameters**: `serial_port` (자동 감지), `baud_rate` (115200), `angular_scale` (2.5)
+- 노드 종료 시 자동으로 바퀴 정지 명령 전송
+
+#### Python → C++ 롤백 방법
+
+launch 파일에서 패키지명과 실행 파일명만 바꾸면 됩니다:
+
+```python
+# C++ (현재)
+Node(package='ugv_cpp_nodes', executable='ugv_driver_node', name='ugv_driver')
+Node(package='ugv_cpp_nodes', executable='roarm_driver_node', name='roarm_driver')
+
+# Python (롤백)
+Node(package='ugv_bringup', executable='ugv_driver', name='ugv_driver')
+Node(package='ugv_bringup', executable='roarm_driver', name='roarm_driver')
+```
+
+### (Legacy) `roarm_driver` Python 버전 (in `ugv_bringup`)
+
+> C++ 버전(`ugv_cpp_nodes`)으로 대체되었습니다. Python 코드는 `ugv_bringup` 패키지에 그대로 남아 있어 롤백 가능합니다.
+
+RoArm-M2 로봇팔을 시리얼(`/dev/ttyUSB0`)로 제어하는 ROS 2 드라이버 노드 (Python 버전).
 
 - **Subscribe**: `/arm_controller/joint_trajectory` (JointTrajectory) → T:102 시리얼 명령 (팔 3관절만)
 - **Subscribe**: `/roarm/gripper_cmd` (Float64) → T:106 그리퍼 명령 (독립 제어)
@@ -219,7 +319,7 @@ git add -A && git commit -m "설명" && git push origin ros2-humble-develop
 
 # RPi: pull & build (SSH)
 cd ~/ugv_ws && git pull origin ros2-humble-develop
-colcon build --packages-select ugv_bringup ugv_bridge rf2o_laser_odometry ugv_roarm_description
+colcon build --packages-select ugv_bringup ugv_cpp_nodes ugv_bridge rf2o_laser_odometry ugv_roarm_description
 source install/setup.bash
 ```
 

@@ -31,10 +31,10 @@ def generate_launch_description():
         output='screen',
     )
 
-    # 3. UGV Driver — /cmd_vel -> ESP32 motor commands
+    # 3. UGV Driver — /cmd_vel -> ESP32 motor commands (C++)
     ugv_driver_node = Node(
-        package='ugv_bringup',
-        executable='ugv_driver',
+        package='ugv_cpp_nodes',
+        executable='ugv_driver_node',
         name='ugv_driver',
         output='screen',
         parameters=[],
@@ -58,10 +58,10 @@ def generate_launch_description():
         }],
     )
 
-    # 5. RoArm-M2 Driver — /arm_controller/joint_trajectory -> ESP32 serial
+    # 5. RoArm-M2 Driver — /arm_controller/joint_trajectory -> ESP32 serial (C++)
     roarm_driver_node = Node(
-        package='ugv_bringup',
-        executable='roarm_driver',
+        package='ugv_cpp_nodes',
+        executable='roarm_driver_node',
         name='roarm_driver',
         output='screen',
         parameters=[{

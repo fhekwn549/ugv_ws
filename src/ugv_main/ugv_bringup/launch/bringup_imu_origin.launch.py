@@ -71,8 +71,8 @@ def generate_launch_description():
     )
     # Define the base node with parameters    
     driver_node = Node(
-        package='ugv_bringup',
-        executable='ugv_driver',
+        package='ugv_cpp_nodes',
+        executable='ugv_driver_node',
     )
     # Define the base node with parameters
     base_node = Node(
