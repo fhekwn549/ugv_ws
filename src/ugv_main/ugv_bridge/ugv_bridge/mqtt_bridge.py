@@ -88,6 +88,11 @@ class MqttBridge:
             if self._logger:
                 self._logger.info(f"MQTT connected to {self._host}:{self._port}")
             client.subscribe(self._topic("cmd_vel"), qos=0)
+            client.subscribe(self._topic("arm"), qos=1)
+            client.subscribe(self._topic("gripper"), qos=1)
+            client.subscribe(self._topic("navigate"), qos=1)
+            client.subscribe(self._topic("cancel"), qos=1)
+            client.subscribe(self._topic("initial_pose"), qos=1)
         else:
             if self._logger:
                 self._logger.error(f"MQTT connect rc={rc}")
@@ -99,9 +104,15 @@ class MqttBridge:
     def _on_message(self, client, userdata, msg: mqtt.MQTTMessage):
         topic_suffix = msg.topic.replace(f"{self._robot_id}/", "", 1)
 
+        try:
+            data = json.loads(msg.payload)
+        except Exception as exc:
+            if self._logger:
+                self._logger.error(f"Bad MQTT payload on {msg.topic}: {exc}")
+            return
+
         if topic_suffix == "cmd_vel":
             try:
-                data = json.loads(msg.payload)
                 linear = float(data.get("linear", 0.0))
                 angular = float(data.get("angular", 0.0))
                 self._ros_if.publish_cmd_vel(linear, angular)
@@ -110,6 +121,49 @@ class MqttBridge:
             except Exception as exc:
                 if self._logger:
                     self._logger.error(f"Bad cmd_vel payload: {exc}")
+
+        elif topic_suffix == "arm":
+            try:
+                positions = [float(p) for p in data.get("positions", [])]
+                self._ros_if.publish_arm(positions)
+            except Exception as exc:
+                if self._logger:
+                    self._logger.error(f"Bad arm payload: {exc}")
+
+        elif topic_suffix == "gripper":
+            try:
+                value = float(data.get("value", 0.0))
+                self._ros_if.publish_gripper(value)
+            except Exception as exc:
+                if self._logger:
+                    self._logger.error(f"Bad gripper payload: {exc}")
+
+        elif topic_suffix == "navigate":
+            try:
+                x = float(data.get("x", 0.0))
+                y = float(data.get("y", 0.0))
+                theta = float(data.get("theta", 0.0))
+                self._ros_if.send_nav_goal(x, y, theta)
+            except Exception as exc:
+                if self._logger:
+                    self._logger.error(f"Bad navigate payload: {exc}")
+
+        elif topic_suffix == "cancel":
+            try:
+                self._ros_if.cancel_nav()
+            except Exception as exc:
+                if self._logger:
+                    self._logger.error(f"Bad cancel payload: {exc}")
+
+        elif topic_suffix == "initial_pose":
+            try:
+                x = float(data.get("x", 0.0))
+                y = float(data.get("y", 0.0))
+                yaw = float(data.get("yaw", 0.0))
+                self._ros_if.publish_initial_pose(x, y, yaw)
+            except Exception as exc:
+                if self._logger:
+                    self._logger.error(f"Bad initial_pose payload: {exc}")
 
     # -- publish loop --
 
