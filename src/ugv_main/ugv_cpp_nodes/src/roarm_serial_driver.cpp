@@ -161,10 +161,12 @@ std::string RoArmSerialDriver::send_query(const std::string& json) {
     serial_.flush_input();       // 이전 잔여 데이터 제거
     serial_.write_bytes(json + "\n");
 
-    // 최대 5줄을 읽으면서 실제 응답을 찾습니다
-    for (int i = 0; i < 5; ++i) {
-        std::string line = serial_.read_line(500);  // 500ms 타임아웃
-        if (line.empty()) break;  // 타임아웃 — 더 이상 데이터 없음
+    // 최대 10줄을 읽으면서 실제 응답을 찾습니다
+    // ESP32는 에코 → 빈 줄(\r\n) → 응답 순서로 보내므로,
+    // 빈 줄(empty)도 건너뛰어야 합니다 (break하면 안 됨!)
+    for (int i = 0; i < 10; ++i) {
+        std::string line = serial_.read_line(100);  // 100ms 타임아웃 (짧게, 반복으로 커버)
+        if (line.empty()) continue;  // 빈 줄 또는 짧은 타임아웃 — 다음 줄 시도
 
         // JSON의 "T" 필드가 있는 줄만 검사합니다
         if (line.find("\"T\"") != std::string::npos || line.find("\"T\":") != std::string::npos) {
