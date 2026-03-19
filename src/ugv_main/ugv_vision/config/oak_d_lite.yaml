@@ -1,8 +1,0 @@
-/oak:
-  ros__parameters:
-    camera:
-      i_enable_imu: false
-      i_enable_ir: false
-      i_nn_type: none
-    stereo:
-      i_subpixel: true
