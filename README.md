@@ -15,7 +15,7 @@
 | 리포 | 역할 | 내용 |
 |------|------|------|
 | **이 리포 (`ugv_ws`)** | 하드웨어 구동 + 웹 브릿지 + 로봇 정의 | 시리얼 드라이버, 센서 처리, MQTT/REST 브릿지, URDF, launch, Nav2, Gazebo 시뮬레이션 |
-| [ugv_dashboard](https://github.com/fhekwn549/ugv_dashboard) | 웹 대시보드 프론트엔드 | Vue 3 + STOMP/WebSocket, 맵/LiDAR 시각화, 원격 제어 |
+| [ugv_dashboard](https://github.com/fhekwn549/ugv_dashboard) | 웹 대시보드 프론트엔드 | Vue 3 + Three.js + STOMP/WebSocket, 3D 로봇 뷰어, 맵/LiDAR 시각화, 원격 제어 |
 
 RPi에서는 `ugv_ws` 하나만 클론하면 됩니다. `ugv_roarm_description`의 `rasp_bringup.launch.py`가 드라이버 노드들을 실행합니다. 웹 대시보드는 `ugv_bridge`의 FastAPI가 정적 파일을 서빙합니다.
 
