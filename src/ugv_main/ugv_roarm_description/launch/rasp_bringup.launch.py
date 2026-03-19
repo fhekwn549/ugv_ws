@@ -105,16 +105,12 @@ def generate_launch_description():
                    'base_lidar_link', 'base_laser']
     )
 
-    # FastDDS 사용 (CycloneDDS의 serdata 경고 제거)
-    use_fastdds = SetEnvironmentVariable('RMW_IMPLEMENTATION', 'rmw_fastrtps_cpp')
-    # FastDDS 전송 버퍼 설정 (LaserScan 등 대형 메시지용)
-    fastdds_profile = SetEnvironmentVariable(
-        'FASTRTPS_DEFAULT_PROFILES_FILE',
-        os.path.join(pkg_dir, 'config', 'fastdds.xml'))
+    # CycloneDDS 사용 (FastDDS 2.6.x/Humble는 대형 메시지에서
+    # "sequence size exceeds remaining buffer" 문제 있음. Iron+ 에서 개선 예정)
+    use_cyclonedds = SetEnvironmentVariable('RMW_IMPLEMENTATION', 'rmw_cyclonedds_cpp')
 
     return LaunchDescription([
-        use_fastdds,
-        fastdds_profile,
+        use_cyclonedds,
         robot_state_publisher_node,
         ugv_driver_node,
         rf2o_node,
