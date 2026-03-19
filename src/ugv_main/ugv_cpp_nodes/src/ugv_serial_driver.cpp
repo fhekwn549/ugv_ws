@@ -87,6 +87,10 @@ void UgvSerialDriver::feedback_loop() {
 }
 
 std::optional<UgvFeedback> UgvSerialDriver::parse_feedback(const std::string& line) {
+    // 불완전한 JSON 라인 거부: { 로 시작하고 } 로 끝나야 함
+    // 시리얼 읽기에서 라인이 잘리면 필드 값이 깨질 수 있음
+    if (line.empty() || line.front() != '{' || line.back() != '}') return std::nullopt;
+
     // T:1001이 포함되지 않은 라인은 무시
     if (line.find("1001") == std::string::npos) return std::nullopt;
 
