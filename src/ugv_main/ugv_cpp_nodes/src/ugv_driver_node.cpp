@@ -157,11 +157,17 @@ private:
 
     void feedback_timer_callback() {
         auto fb = driver_->get_feedback();
-        if (!fb) return;
+        if (fb) {
+            last_good_feedback_ = *fb;  // 정상 데이터 캐시
+            has_feedback_ = true;
+        }
 
-        publish_imu(*fb);
-        publish_odom_raw(*fb);
-        publish_voltage(*fb);
+        // 마지막 정상 값으로 항상 발행 (Python ugv_bringup과 동일한 동작)
+        if (!has_feedback_) return;
+
+        publish_imu(last_good_feedback_);
+        publish_odom_raw(last_good_feedback_);
+        publish_voltage(last_good_feedback_);
     }
 
     void publish_imu(const ugv::UgvFeedback& fb) {
@@ -216,6 +222,10 @@ private:
     rclcpp::TimerBase::SharedPtr feedback_timer_;
 
     double angular_scale_ = 2.5;
+
+    // 마지막 정상 피드백 캐시 (깨진 라인 무시, 안정적 발행)
+    ugv::UgvFeedback last_good_feedback_;
+    bool has_feedback_ = false;
 };
 
 int main(int argc, char** argv) {

@@ -120,17 +120,25 @@ std::optional<UgvFeedback> UgvSerialDriver::parse_feedback(const std::string& li
         return val;
     };
 
-    UgvFeedback fb;
     auto t = extract("T");
     if (!t || static_cast<int>(*t) != 1001) return std::nullopt;
 
+    // 필수 필드 추출 — 하나라도 없으면 깨진 라인이므로 거부
+    auto r = extract("r");
+    auto p = extract("p");
+    auto y = extract("y");
+    auto v = extract("v");
+    if (!r || !p || !y || !v) return std::nullopt;
+
+    UgvFeedback fb;
+    fb.r = *r;
+    fb.p = *p;
+    fb.y = *y;
+    fb.v = *v;
+
     auto L = extract("L"); if (L) fb.L = static_cast<int>(*L);
     auto R = extract("R"); if (R) fb.R = static_cast<int>(*R);
-    auto r = extract("r"); if (r) fb.r = *r;
-    auto p = extract("p"); if (p) fb.p = *p;
-    auto y = extract("y"); if (y) fb.y = *y;
     auto temp = extract("temp"); if (temp) fb.temp = *temp;
-    auto v = extract("v"); if (v) fb.v = *v;
 
     return fb;
 }
