@@ -84,6 +84,12 @@ private:
     bool opened_ = false;    ///< 포트 열림 상태
     std::mutex mutex_;       ///< 스레드 안전 보장용 뮤텍스
 
+    // 버퍼드 읽기 (Python ReadLine 클래스와 동일한 방식)
+    static constexpr size_t READ_BUF_SIZE = 1024;
+    char read_buf_[READ_BUF_SIZE];
+    size_t buf_start_ = 0;  ///< 버퍼에서 아직 처리 안 된 데이터 시작
+    size_t buf_end_ = 0;    ///< 버퍼에서 유효 데이터 끝
+
     /// @brief 정수 보드레이트를 termios speed_t 상수로 변환합니다.
     /// @param baud 정수 보드레이트 (예: 115200)
     /// @return 대응하는 termios 상수 (예: B115200)

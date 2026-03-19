@@ -133,13 +133,12 @@ int SerialDriver::write_bytes(const std::string& data) {
     return static_cast<int>(n);
 }
 
-/// 시리얼 포트에서 한 줄을 읽습니다.
+/// 시리얼 포트에서 한 줄을 읽습니다 (버퍼드 방식).
 ///
-/// 작동 방식:
-/// 1. select()로 데이터가 올 때까지 대기 (타임아웃 있음)
-/// 2. 한 바이트씩 읽으면서 개행 문자(\n)를 만나면 반환
-/// 3. 캐리지 리턴(\r)은 무시
-/// 4. 타임아웃 초과 시 빈 문자열 반환
+/// Python ReadLine 클래스와 동일한 방식:
+/// 1. 내부 버퍼에 \n이 있으면 즉시 반환
+/// 2. 없으면 select()로 대기 후 최대 512바이트를 한번에 읽기
+/// 3. 1바이트씩 읽는 것보다 시스템 콜 수가 대폭 감소 → 바이트 유실 방지
 ///
 /// ESP32의 응답 형식: "{"T":"1051","b":0.1,...}\r\n"
 /// 이 함수는 \r\n을 제거하고 JSON 부분만 반환합니다.
@@ -147,14 +146,28 @@ std::string SerialDriver::read_line(int timeout_ms) {
     if (!opened_) return {};
 
     std::string result;
-    result.reserve(256);  // 메모리 재할당 최소화를 위해 256바이트 미리 확보
+    result.reserve(256);
 
-    auto deadline_us = timeout_ms * 1000;  // 밀리초 → 마이크로초 변환
+    auto deadline_us = timeout_ms * 1000;
     int elapsed = 0;
 
     while (elapsed < deadline_us) {
-        // select(): 파일 디스크립터에 읽을 데이터가 있을 때까지 대기
-        // 타임아웃을 설정하여 무한 대기를 방지합니다
+        // 1. 내부 버퍼에 데이터가 있으면 \n 탐색
+        while (buf_start_ < buf_end_) {
+            char c = read_buf_[buf_start_++];
+            if (c == '\n') {
+                return result;
+            }
+            if (c != '\r') {
+                result += c;
+            }
+        }
+
+        // 버퍼 소진 → 리셋
+        buf_start_ = 0;
+        buf_end_ = 0;
+
+        // 2. select()로 데이터 대기
         fd_set fds;
         FD_ZERO(&fds);
         FD_SET(fd_, &fds);
@@ -165,33 +178,31 @@ std::string SerialDriver::read_line(int timeout_ms) {
         tv.tv_usec = remaining % 1000000;
 
         int ret = select(fd_ + 1, &fds, nullptr, nullptr, &tv);
-        if (ret <= 0) break;  // 타임아웃(0) 또는 에러(-1)
+        if (ret <= 0) break;  // 타임아웃 또는 에러
 
-        // 한 바이트 읽기
-        char c;
-        ssize_t n = ::read(fd_, &c, 1);
-        if (n <= 0) break;  // 읽기 실패
+        // 3. 최대 512바이트를 한번에 읽기 (Python ReadLine과 동일)
+        ssize_t n = ::read(fd_, read_buf_, std::min(static_cast<size_t>(512), READ_BUF_SIZE));
+        if (n <= 0) break;
 
-        if (c == '\n') {
-            return result;  // 개행 = 한 줄 완성
-        }
-        if (c != '\r') {
-            result += c;    // 캐리지 리턴은 무시, 나머지 문자는 추가
-        }
+        buf_start_ = 0;
+        buf_end_ = static_cast<size_t>(n);
 
-        // 경과 시간 근사치 (115200bps에서 1바이트 ≈ 약 0.087ms)
-        elapsed += 1000;  // ~1ms per char
+        // 경과 시간 근사치
+        elapsed += 5000;  // ~5ms per chunk
     }
 
-    return result;  // 타임아웃 — 불완전한 줄 또는 빈 문자열 반환
+    return result;  // 타임아웃
 }
 
 /// 수신 버퍼를 비웁니다.
 /// 새 쿼리를 보내기 전에 이전 응답의 잔여 데이터를 제거하는 데 사용합니다.
 void SerialDriver::flush_input() {
     if (fd_ >= 0) {
-        tcflush(fd_, TCIFLUSH);  // TCIFLUSH = 입력 버퍼만 비움
+        tcflush(fd_, TCIFLUSH);  // TCIFLUSH = 커널 입력 버퍼 비움
     }
+    // 내부 읽기 버퍼도 비움
+    buf_start_ = 0;
+    buf_end_ = 0;
 }
 
 }  // namespace ugv
