@@ -57,8 +57,13 @@ bool UgvSerialDriver::is_connected() const {
 // === 센서 피드백 ===
 
 void UgvSerialDriver::enable_feedback() {
-    // ESP32에 연속 피드백 모드 활성화 명령 전송
+    // Waveshare 공식 초기화 순서 (ugv_rpi/app.py 참조):
+    // 1. 피드백 간격 설정 (50ms 추가 딜레이)
+    send_command(R"({"T":142,"cmd":50})");
+    // 2. 연속 피드백 모드 활성화
     send_command(R"({"T":131,"cmd":1})");
+    // 3. 시리얼 에코 OFF — 에코가 피드백 스트림에 섞여 데이터 깨짐 방지
+    send_command(R"({"T":143,"cmd":0})");
 
     // 피드백 읽기 스레드 시작
     feedback_running_ = true;
