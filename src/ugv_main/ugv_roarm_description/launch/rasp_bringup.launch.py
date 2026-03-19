@@ -107,9 +107,14 @@ def generate_launch_description():
 
     # FastDDS 사용 (CycloneDDS의 serdata 경고 제거)
     use_fastdds = SetEnvironmentVariable('RMW_IMPLEMENTATION', 'rmw_fastrtps_cpp')
+    # FastDDS 전송 버퍼 설정 (LaserScan 등 대형 메시지용)
+    fastdds_profile = SetEnvironmentVariable(
+        'FASTRTPS_DEFAULT_PROFILES_FILE',
+        os.path.join(pkg_dir, 'config', 'fastdds.xml'))
 
     return LaunchDescription([
         use_fastdds,
+        fastdds_profile,
         robot_state_publisher_node,
         ugv_driver_node,
         rf2o_node,
