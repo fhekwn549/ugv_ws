@@ -27,7 +27,8 @@ RPi에서는 `ugv_ws` 하나만 클론하면 됩니다. `ugv_roarm_description`�
 | `/dev/ttyUSB0` | RoArm-M2 ESP32 | `roarm_driver_node` | **C++** | `ugv_cpp_nodes` |
 | `/dev/ttyUSB1` | LDLidar (STL-19P) | `ldlidar_ros2_node` | C++ | `ldlidar_ros2` |
 
-> **C++ 드라이버 전환 (2026-03)**: 실시간 통신 성능 개선을 위해 `ugv_driver`와 `roarm_driver`를 Python에서 C++로 전환했습니다.
+> **C++ 드라이버 통합 (2026-03)**: 실시간 통신 성능 개선을 위해 `ugv_driver`, `roarm_driver`, `ugv_bringup`(센서 피드백)을 Python에서 C++로 전환했습니다.
+> `ugv_driver_node`가 제어(cmd_vel)와 센서(IMU, 전압, 인코더)를 단일 노드에서 처리하여 시리얼 포트 이중 접근 문제를 해결합니다.
 > 기존 Python 드라이버(`ugv_bringup` 패키지)는 그대로 유지되므로, 필요 시 launch 파일에서 패키지명만 바꾸면 롤백 가능합니다.
 > 자세한 내용은 아래 [C++ 실시간 드라이버](#added-ugv_cpp_nodes-c-실시간-시리얼-드라이버) 섹션을 참고하세요.
 
@@ -56,11 +57,11 @@ RPi에서는 `ugv_ws` 하나만 클론하면 됩니다. `ugv_roarm_description`�
 │  - REST: 맵 PNG, 로그 조회 (읽기 전용)                      │
 │  - RabbitMQ: MQTT:1883 + STOMP:61613 + Web STOMP:15674     │
 └──────────┬──────────────────────────────────────────────────┘
-           │ CycloneDDS (ROS 2 토픽)
+           │ FastDDS (ROS 2 토픽)
 ┌──────────▼──────────────────────────────────────────────────┐
 │  RPi ROS 2 노드                                            │
-│  ugv_driver(C++) + roarm_driver(C++) + ldlidar + rf2o_odom  │
-│  Cartographer (SLAM/localization) + Nav2                    │
+│  ugv_driver(C++, 제어+센서) + roarm_driver(C++) + ldlidar   │
+│  + rf2o_odom + Cartographer (SLAM/localization) + Nav2      │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -82,7 +83,7 @@ cd ~ && git clone -b ros2-humble-develop https://github.com/fhekwn549/ugv_ws.git
 
 # 의존성
 pip3 install pyserial fastapi uvicorn paho-mqtt
-sudo apt install ros-humble-rmw-cyclonedds-cpp ros-humble-xacro \
+sudo apt install ros-humble-rmw-fastrtps-cpp ros-humble-xacro \
   ros-humble-robot-state-publisher ros-humble-joint-state-publisher \
   rabbitmq-server
 # RabbitMQ 플러그인 활성화
@@ -97,7 +98,7 @@ echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 
 # 빌드
 cd ~/ugv_ws && source /opt/ros/humble/setup.bash
-colcon build --packages-select ugv_bringup ugv_cpp_nodes ugv_bridge ugv_roarm_description \
+colcon build --packages-select ugv_cpp_nodes ugv_bridge ugv_roarm_description \
   ugv_description rf2o_laser_odometry ugv_interface ldlidar
 source install/setup.bash
 ```
@@ -109,13 +110,13 @@ source install/setup.bash
 cd ~ && git clone -b ros2-humble-develop https://github.com/fhekwn549/ugv_ws.git
 
 # 의존성
-sudo apt install ros-humble-rmw-cyclonedds-cpp ros-humble-xacro \
+sudo apt install ros-humble-rmw-fastrtps-cpp ros-humble-xacro \
   ros-humble-robot-state-publisher ros-humble-joint-state-publisher \
   ros-humble-joint-state-publisher-gui ros-humble-rviz2 ros-humble-tf2-ros
 
 # 빌드
 cd ~/ugv_ws && source /opt/ros/humble/setup.bash
-colcon build --packages-select ugv_bringup ugv_cpp_nodes ugv_roarm_description ugv_description
+colcon build --packages-select ugv_cpp_nodes ugv_roarm_description ugv_description
 source install/setup.bash
 ```
 
@@ -149,7 +150,7 @@ source ~/ugv_ws/install/setup.bash
 ros2 launch ugv_roarm_description nav_real.launch.py pbstream:=/home/pi/maps/lab_map.pbstream
 ```
 
-#### 방법 B: RViz로 시각화 (CycloneDDS 설정 필요)
+#### 방법 B: RViz로 시각화 (FastDDS 설정 필요)
 
 ```bash
 # RPi는 자동 실행 (ugv_bringup.service)
@@ -163,7 +164,7 @@ source ~/ugv_ws/install/setup.bash
 ros2 run ugv_roarm_description teleop_all.py --ros-args -p mode:=rviz -p model:=rasp_rover
 ```
 
-> **참고**: WSL2는 기본적으로 NAT 모드라 DDS 멀티캐스트가 RPi까지 안 갑니다. 방법 B는 CycloneDDS unicast 설정이 필요합니다.
+> **참고**: WSL2는 기본적으로 NAT 모드라 DDS 멀티캐스트가 RPi까지 안 갑니다. 방법 B는 FastDDS unicast 설정이 필요합니다.
 
 ---
 
@@ -192,8 +193,8 @@ ROS 2 토픽을 MQTT/REST API로 변환하여 웹 대시보드와 연동하는 �
 
 ### Added: `ugv_cpp_nodes` (C++ 실시간 시리얼 드라이버)
 
-실시간 통신 성능 개선을 위해 `ugv_driver`와 `roarm_driver`를 Python에서 C++로 전환한 패키지입니다.
-기존 Python 드라이버(`ugv_bringup` 패키지)의 토픽/파라미터를 1:1 유지하여, ROS 2 네트워크 관점에서 동일하게 동작합니다.
+실시간 통신 성능 개선을 위해 `ugv_driver`, `roarm_driver`, `ugv_bringup`(센서 피드백)을 Python에서 C++로 전환한 패키지입니다.
+`ugv_driver_node`가 제어와 센서 피드백을 단일 노드에서 처리하여, 시리얼 포트 이중 접근으로 인한 데이터 깨짐 문제를 해결합니다.
 
 #### 왜 C++로 전환했는가?
 
@@ -247,9 +248,9 @@ src/ugv_main/ugv_cpp_nodes/
 └── src/
     ├── serial_driver.cpp                       # termios 시리얼 통신 구현
     ├── roarm_serial_driver.cpp                 # T:102/105/106/210 명령/응답
-    ├── ugv_serial_driver.cpp                   # T:13/132/134 명령 (write-only)
+    ├── ugv_serial_driver.cpp                   # T:13/132/134 명령 + T:1001 피드백 읽기
     ├── roarm_driver_node.cpp                   # ROS2 노드: /joint_states 발행
-    └── ugv_driver_node.cpp                     # ROS2 노드: /cmd_vel 수신
+    └── ugv_driver_node.cpp                     # ROS2 노드: 제어(/cmd_vel) + 센서(/imu, /voltage)
 ```
 
 #### roarm_driver_node (RoArm-M2 로봇팔)
@@ -261,26 +262,30 @@ src/ugv_main/ugv_cpp_nodes/
 - 팔 관절 이동 시 그리퍼 토크 유지 (T:102에 항상 `hand` 값 포함)
 - 바퀴 관절 (인코더 없음)은 0.0으로 발행 → TF 트리 완성
 
-#### ugv_driver_node (UGV 바퀴/팬틸트/LED)
+#### ugv_driver_node (UGV 통합: 제어 + 센서 피드백)
 
 - **Subscribe**: `cmd_vel` (Twist) → T:13 모터 속도
 - **Subscribe**: `ugv/joint_states` (JointState) → T:134 팬틸트 (rad→deg 변환)
 - **Subscribe**: `ugv/led_ctrl` (Float32MultiArray) → T:132 LED
-- **Subscribe**: `voltage` (Float32) → 저전압 경고 로그
+- **Publish**: `imu/data` (Imu) ← T:1001 피드백 (r/p/y → 쿼터니언, 20Hz)
+- **Publish**: `odom/odom_raw` (Float32MultiArray) ← T:1001 인코더 (L/R)
+- **Publish**: `voltage` (Float32) ← T:1001 배터리 전압 + 저전압 경고 로그
 - **Parameters**: `serial_port` (자동 감지), `baud_rate` (115200), `angular_scale` (2.5)
+- 시작 시 T:131로 ESP32 연속 피드백 활성화, 전용 스레드에서 읽기
 - 노드 종료 시 자동으로 바퀴 정지 명령 전송
 
 #### Python → C++ 롤백 방법
 
-launch 파일에서 패키지명과 실행 파일명만 바꾸면 됩니다:
+launch 파일에서 `ugv_driver_node`를 `ugv_bringup` + `ugv_driver`로 되돌리면 됩니다:
 
 ```python
-# C++ (현재)
+# C++ (현재) — 제어 + 센서를 단일 노드가 처리
 Node(package='ugv_cpp_nodes', executable='ugv_driver_node', name='ugv_driver')
 Node(package='ugv_cpp_nodes', executable='roarm_driver_node', name='roarm_driver')
 
-# Python (롤백)
-Node(package='ugv_bringup', executable='ugv_driver', name='ugv_driver')
+# Python (롤백) — 센서와 제어가 별도 노드 (시리얼 포트 이중 접근 주의)
+Node(package='ugv_bringup', executable='ugv_bringup', name='ugv_bringup')  # 센서 피드백
+Node(package='ugv_bringup', executable='ugv_driver', name='ugv_driver')    # 제어 명령
 Node(package='ugv_bringup', executable='roarm_driver', name='roarm_driver')
 ```
 
@@ -319,7 +324,7 @@ git add -A && git commit -m "설명" && git push origin ros2-humble-develop
 
 # RPi: pull & build (SSH)
 cd ~/ugv_ws && git pull origin ros2-humble-develop
-colcon build --packages-select ugv_bringup ugv_cpp_nodes ugv_bridge rf2o_laser_odometry ugv_roarm_description
+colcon build --packages-select ugv_cpp_nodes ugv_bridge rf2o_laser_odometry ugv_roarm_description
 source install/setup.bash
 ```
 

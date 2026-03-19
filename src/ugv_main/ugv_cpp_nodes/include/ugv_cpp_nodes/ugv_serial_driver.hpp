@@ -34,18 +34,33 @@
 #include "ugv_cpp_nodes/serial_driver.hpp"
 
 #include <string>
+#include <thread>
+#include <atomic>
+#include <optional>
+#include <mutex>
 
 namespace ugv {
 
-/// UGV 바퀴/팬틸트/LED를 ESP32 시리얼로 제어하는 드라이버.
+/// ESP32 바퀴 보드 센서 피드백 데이터 (T:1001).
 ///
-/// RoArmSerialDriver와 달리 단방향(write-only) 통신입니다.
-/// ESP32에 명령을 보내기만 하고 응답을 기다리지 않습니다.
+/// ESP32가 T:131 명령으로 활성화되면 연속으로 전송하는 센서 데이터입니다.
+/// 형식: {"T":1001,"L":0,"R":0,"r":-0.13,"p":0.09,"y":-176.3,"temp":72.2,"v":12.06}
+struct UgvFeedback {
+    int L = 0;          ///< 왼쪽 인코더 틱
+    int R = 0;          ///< 오른쪽 인코더 틱
+    double r = 0.0;     ///< Roll (degrees)
+    double p = 0.0;     ///< Pitch (degrees)
+    double y = 0.0;     ///< Yaw (degrees)
+    double temp = 0.0;  ///< 온도 (°C)
+    double v = 0.0;     ///< 배터리 전압 (V)
+};
+
+/// UGV 바퀴/팬틸트/LED를 ESP32 시리얼로 제어하고 센서 피드백을 읽는 드라이버.
 ///
 /// ## 왜 RoArmSerialDriver와 분리되어 있는가?
 /// 1. 물리적으로 다른 시리얼 포트 사용 (ttyAMA0 vs ttyUSB0)
 /// 2. 다른 ESP32 펌웨어 (바퀴용 vs 팔용)
-/// 3. 통신 패턴이 다름 (write-only vs request-response)
+/// 3. 통신 패턴이 다름 (양방향: 명령 쓰기 + 피드백 읽기)
 class UgvSerialDriver {
 public:
     /// @brief 드라이버를 생성합니다 (아직 연결하지 않음).
@@ -54,40 +69,61 @@ public:
     explicit UgvSerialDriver(const std::string& port = "/dev/ttyAMA0",
                               int baud_rate = 115200);
 
+    /// @brief 피드백 스레드를 정지하고 시리얼 포트를 닫습니다.
+    ~UgvSerialDriver();
+
+    // 스레드를 소유하므로 복사/이동 금지
+    UgvSerialDriver(const UgvSerialDriver&) = delete;
+    UgvSerialDriver& operator=(const UgvSerialDriver&) = delete;
+
     /// @brief 시리얼 포트를 열고 ESP32와 연결합니다.
     bool connect();
 
-    /// @brief 시리얼 포트를 닫습니다.
+    /// @brief 피드백 스레드를 정지하고 시리얼 포트를 닫습니다.
     void disconnect();
 
     /// @brief 연결 상태를 확인합니다.
     bool is_connected() const;
 
+    // === 제어 명령 (쓰기) ===
+
     /// @brief 바퀴 속도를 설정합니다 (T:13).
-    /// @param linear 선속도 (m/s, 양수=전진, 음수=후진)
-    /// @param angular 각속도 (rad/s, 양수=반시계, 음수=시계)
-    ///
-    /// angular_scale은 이 드라이버가 아닌 ROS2 노드(UgvDriverNode)에서 적용합니다.
-    /// 이 함수는 스케일링된 최종 값을 받습니다.
     bool set_velocity(double linear, double angular);
 
     /// @brief 팬틸트 카메라 각도를 설정합니다 (T:134).
-    /// @param x_deg 수평 회전 (도, degree)
-    /// @param y_deg 수직 회전 (도, degree)
-    /// @param sx 수평 서보 속도 (0~1000, 기본값 600)
-    /// @param sy 수직 서보 속도 (0~1000, 기본값 600)
     bool set_pan_tilt(double x_deg, double y_deg, int sx = 600, int sy = 600);
 
     /// @brief LED를 제어합니다 (T:132).
-    /// @param io4 GPIO4 핀 상태 (0.0=끔, 1.0=켬)
-    /// @param io5 GPIO5 핀 상태 (0.0=끔, 1.0=켬)
     bool set_led(double io4, double io5);
+
+    // === 센서 피드백 (읽기) ===
+
+    /// @brief ESP32 연속 피드백(T:131)을 활성화하고 읽기 스레드를 시작합니다.
+    void enable_feedback();
+
+    /// @brief 최신 피드백 데이터를 반환합니다.
+    /// 새 데이터가 있으면 반환하고 내부 플래그를 초기화합니다.
+    /// 새 데이터가 없으면 nullopt를 반환합니다.
+    std::optional<UgvFeedback> get_feedback();
 
 private:
     SerialDriver serial_;  ///< 저수준 시리얼 포트 드라이버
 
     /// @brief JSON 명령을 전송합니다. 뮤텍스로 보호됩니다.
     void send_command(const std::string& json);
+
+    // === 피드백 스레드 ===
+    std::thread feedback_thread_;
+    std::mutex feedback_mutex_;
+    std::optional<UgvFeedback> latest_feedback_;
+    std::atomic<bool> feedback_running_{false};
+
+    /// @brief 피드백 읽기 루프 (백그라운드 스레드에서 실행).
+    void feedback_loop();
+
+    /// @brief T:1001 JSON 라인을 파싱합니다.
+    /// @return 성공 시 UgvFeedback, 실패 시 nullopt
+    static std::optional<UgvFeedback> parse_feedback(const std::string& line);
 };
 
 }  // namespace ugv

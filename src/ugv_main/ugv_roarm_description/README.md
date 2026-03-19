@@ -16,16 +16,16 @@ RPi에서는 `ugv_roarm_description` + `ugv_ws` 두 리포가 필요합니다. �
 
 ---
 
-## 통신 아키텍처 (CycloneDDS)
+## 통신 아키텍처 (FastDDS)
 
-WSL2와 RPi는 **CycloneDDS**를 통해 직접 DDS 통신합니다. rosbridge/WebSocket 브릿지 없이 네이티브 ROS 2 토픽이 양방향으로 전달됩니다.
+WSL2와 RPi는 **FastDDS**를 통해 직접 DDS 통신합니다. rosbridge/WebSocket 브릿지 없이 네이티브 ROS 2 토픽이 양방향으로 전달됩니다.
 
 ```
 RPi (rasp_bringup.launch.py)                WSL (slam_real / nav_real / remote_view)
 ├── robot_state_publisher ──DDS──→          ├── Cartographer / Nav2
-├── ugv_driver                               ├── RViz2
+├── ugv_driver (C++, 제어+센서)              ├── RViz2
 ├── rf2o_laser_odometry (odom + TF) ←DDS──  └── teleop_all.py
-├── roarm_driver                  │
+├── roarm_driver (C++)            │
 ├── ldlidar_ros2                  │
 ├── ugv_bridge (MQTT + REST)      │         웹 브라우저 (ugv_dashboard)
 │   ├── FastAPI (:8081) ←─────────────────  ├── Vue 3 + MQTT.js
@@ -33,38 +33,14 @@ RPi (rasp_bringup.launch.py)                WSL (slam_real / nav_real / remote_v
 └── static TF (base_lidar→laser)  └── /cmd_vel, /arm_controller/...
 ```
 
-### CycloneDDS 설정
+### FastDDS 설정
 
-RPi와 WSL 양쪽에 동일한 설정 파일이 필요합니다.
-
-**`~/cyclonedds.xml`:**
-```xml
-<CycloneDDS>
-  <Domain>
-    <General>
-      <AllowMulticast>spdp</AllowMulticast>
-      <Interfaces>
-        <NetworkInterface name="eth0" />  <!-- RPi: eth0, WSL: eth1 등 환경에 맞게 -->
-      </Interfaces>
-    </General>
-    <Discovery>
-      <Peers>
-        <Peer address="192.168.0.71" />   <!-- RPi IP -->
-        <Peer address="localhost" />
-      </Peers>
-      <ParticipantIndex>auto</ParticipantIndex>
-      <MaxAutoParticipantIndex>120</MaxAutoParticipantIndex>
-    </Discovery>
-  </Domain>
-</CycloneDDS>
-```
-
-> Nav2 스택은 많은 노드를 생성하므로 `MaxAutoParticipantIndex`를 120 이상으로 설정해야 합니다. 기본값(10)에서는 "Failed to find a free participant index" 오류가 발생합니다.
+RPi의 `rasp_bringup.launch.py`는 `SetEnvironmentVariable`로 FastDDS를 자동 설정합니다.
+WSL에서 RPi와 크로스 네트워크 DDS 통신을 하려면 양쪽 모두 FastDDS unicast 설정이 필요합니다.
 
 **환경변수 (`.bashrc`):**
 ```bash
-export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-export CYCLONEDDS_URI=file://$HOME/cyclonedds.xml
+export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
 ```
 
 ---
@@ -77,14 +53,14 @@ export CYCLONEDDS_URI=file://$HOME/cyclonedds.xml
 
 | 포트 | 장치 | 드라이버 |
 |------|------|---------|
-| `/dev/ttyAMA0` | UGV 바퀴 ESP32 (General Driver for Robots) | `ugv_bringup` + `ugv_driver` |
-| `/dev/ttyUSB0` | RoArm-M2 ESP32 | `roarm_driver` |
+| `/dev/ttyAMA0` | UGV 바퀴 ESP32 (General Driver for Robots) | `ugv_driver_node` (C++, 제어+센서 통합) |
+| `/dev/ttyUSB0` | RoArm-M2 ESP32 | `roarm_driver_node` (C++) |
 | `/dev/ttyUSB1` | LDLidar STL-19P | `ldlidar_ros2` |
 
 ### ESP32 시리얼 프로토콜 (바퀴 ESP32)
 
 - 포트: `/dev/ttyAMA0`, 115200 baud
-- 피드백은 기본 비활성 → `ugv_bringup`이 시작 시 `{"T":131,"cmd":1}` 전송하여 활성화
+- 피드백은 기본 비활성 → `ugv_driver_node`(C++)가 시작 시 `{"T":131,"cmd":1}` 전송하여 활성화
 - 활성화 후 ESP32가 ~85Hz로 T:1001 피드백 전송:
   ```json
   {"T":1001,"L":0,"R":0,"r":-0.19,"p":1.45,"y":-165.79,"temp":75.0,"v":11.53}
@@ -116,12 +92,12 @@ git clone https://github.com/fhekwn549/ugv_roarm_description.git
 pip3 install pyserial fastapi uvicorn paho-mqtt
 
 # 3. apt 패키지 설치
-sudo apt install ros-humble-rmw-cyclonedds-cpp ros-humble-xacro \
+sudo apt install ros-humble-rmw-fastrtps-cpp ros-humble-xacro \
   ros-humble-robot-state-publisher ros-humble-joint-state-publisher \
   mosquitto
 
-# 4. CycloneDDS 설정 (위의 "CycloneDDS 설정" 섹션 참고)
-# ~/cyclonedds.xml 생성 + .bashrc에 환경변수 추가
+# 4. FastDDS 환경변수 (.bashrc에 추가)
+echo 'export RMW_IMPLEMENTATION=rmw_fastrtps_cpp' >> ~/.bashrc
 
 # 5. 스왑 추가 (RPi RAM 1GB인 경우, C++ 빌드 OOM 방지)
 sudo fallocate -l 2G /swapfile
@@ -131,7 +107,7 @@ echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 # 6. 빌드 (필요한 패키지만)
 cd ~/ugv_ws
 source /opt/ros/humble/setup.bash
-colcon build --packages-select ugv_bringup ugv_bridge ugv_roarm_description \
+colcon build --packages-select ugv_cpp_nodes ugv_bridge ugv_roarm_description \
   ugv_description rf2o_laser_odometry ugv_interface ldlidar
 source install/setup.bash
 
@@ -150,17 +126,17 @@ cd ~/ugv_ws/src/ugv_main
 git clone https://github.com/fhekwn549/ugv_roarm_description.git
 
 # 2. apt 패키지 설치
-sudo apt install ros-humble-rmw-cyclonedds-cpp ros-humble-xacro \
+sudo apt install ros-humble-rmw-fastrtps-cpp ros-humble-xacro \
   ros-humble-robot-state-publisher ros-humble-joint-state-publisher \
   ros-humble-joint-state-publisher-gui ros-humble-rviz2 ros-humble-tf2-ros
 
-# 3. CycloneDDS 설정 (위의 "CycloneDDS 설정" 섹션 참고)
-# ~/cyclonedds.xml 생성 + .bashrc에 환경변수 추가
+# 3. FastDDS 환경변수 (.bashrc에 추가)
+echo 'export RMW_IMPLEMENTATION=rmw_fastrtps_cpp' >> ~/.bashrc
 
 # 4. 빌드
 cd ~/ugv_ws
 source /opt/ros/humble/setup.bash
-colcon build --packages-select ugv_bringup ugv_roarm_description ugv_description
+colcon build --packages-select ugv_cpp_nodes ugv_roarm_description ugv_description
 source install/setup.bash
 
 # 5. bashrc에 자동 source 추가 (최초 1회)
@@ -209,7 +185,7 @@ ros2 run ugv_roarm_description teleop_all.py --ros-args -p mode:=rviz
 
 ```
 [RPi SSH]  rasp_bringup.launch.py        ← 먼저 실행 (하드웨어 준비)
-    ↓ CycloneDDS (자동 discovery)
+    ↓ FastDDS (자동 discovery)
 [WSL 1]    remote_view.launch.py          ← RViz 시각화
 [WSL 2]    teleop_all.py mode:=rviz       ← 마지막 실행 (키보드 조작)
 ```
@@ -404,7 +380,7 @@ ros2 run ugv_roarm_description teleop_all.py
 
 ```
 [RPi SSH]  rasp_bringup.launch.py                  ← 먼저 실행 (하드웨어 준비)
-    ↓ CycloneDDS (자동 discovery)
+    ↓ FastDDS (자동 discovery)
 [WSL 1]    nav_real.launch.py map:=~/maps/map.yaml  ← Nav2 + RViz
 [WSL 2]    teleop_all.py                            ← 선택사항 (수동 개입용)
 ```
@@ -476,7 +452,7 @@ ros2 launch ugv_roarm_description nav_sim.launch.py use_bridge:=true
 - `use_sim_time: false` — 벽시계 사용
 - `yaw_goal_tolerance: 0.15 rad` — 목적지 도착 시 지정 방향으로 회전
 
-> **WSL2 LiDAR 전달 이슈:** CycloneDDS가 WSL2에서 RELIABLE LaserScan을 간헐적으로 전달하지 못하는 문제가 있어, fake_scan_node가 `/dev/shm/ugv_scan.json`에 scan 데이터를 직접 쓰고 bridge가 이를 읽습니다. 실제 로봇에서는 DDS 구독으로 자동 fallback됩니다.
+> **WSL2 LiDAR 전달 이슈:** DDS가 WSL2에서 RELIABLE LaserScan을 간헐적으로 전달하지 못하는 문제가 있어, fake_scan_node가 `/dev/shm/ugv_scan.json`에 scan 데이터를 직접 쓰고 bridge가 이를 읽습니다. 실제 로봇에서는 DDS 구독으로 자동 fallback됩니다.
 
 > **LiDAR Angle Crop:** 실제 로봇은 LiDAR(LD19) 후방에 로봇팔(RoArm-M2)이 위치하여 30°~149° 범위의 readings이 차단됩니다. fake_scan_node와 rasp_bringup의 LD19 드라이버 모두 이 범위를 NaN으로 처리합니다.
 
@@ -525,11 +501,10 @@ ros2 launch ugv_roarm_description nav_sim.launch.py use_bridge:=true
 ```
 [WSL]                                          [RPi]
 teleop_all.py                                  rasp_bringup.launch.py
-  ├─ /cmd_vel ──────┐                            ├─ ugv_driver (/dev/ttyAMA0)
-  ├─ /arm_controller │     CycloneDDS             ├─ roarm_driver (/dev/ttyUSB0)
+  ├─ /cmd_vel ──────┐                            ├─ ugv_driver (C++, 제어+센서, /dev/ttyAMA0)
+  ├─ /arm_controller │     FastDDS                 ├─ roarm_driver (C++, /dev/ttyUSB0)
   │   /joint_trajectory┤  ←── DDS direct ──→       ├─ rf2o_laser_odometry (odom)
-  ├─ /roarm/gripper_cmd┘                           ├─ ugv_bringup (IMU, voltage)
-  │                                                 ├─ ldlidar_ros2 (/dev/ttyUSB1)
+  ├─ /roarm/gripper_cmd┘                           ├─ ldlidar_ros2 (/dev/ttyUSB1)
   │  ← /joint_states, /scan, /odom, /imu ←         └─ static TF (lidar→laser)
   │
   └─ RViz (TF 시각화)
@@ -623,7 +598,7 @@ cd ~/ugv_ws
 git pull origin ros2-humble-develop
 cd src/ugv_main/ugv_roarm_description && git pull origin main
 cd ~/ugv_ws
-colcon build --packages-select ugv_bringup ugv_bridge rf2o_laser_odometry ugv_roarm_description
+colcon build --packages-select ugv_cpp_nodes ugv_bridge rf2o_laser_odometry ugv_roarm_description
 source install/setup.bash
 ```
 
@@ -669,20 +644,20 @@ LiDAR 스캔 매칭 기반 오도메트리. Wave Rover는 인코더가 없으므
 | 증상 | 원인 | 해결 |
 |------|------|------|
 | RViz에서 로봇이 안 보임 | `ugv_description` 미빌드 | `colcon build --packages-select ugv_description` 후 source |
-| WSL에서 RPi 토픽 안 보임 | CycloneDDS 미설정 | `~/cyclonedds.xml` 확인 + `RMW_IMPLEMENTATION`, `CYCLONEDDS_URI` 환경변수 확인 |
+| WSL에서 RPi 토픽 안 보임 | FastDDS 미설정 | `RMW_IMPLEMENTATION=rmw_fastrtps_cpp` 환경변수 확인, FastDDS unicast 설정 확인 |
 | `ros2 topic list`에 RPi 토픽 없음 | 네트워크/방화벽 문제 | `ping 192.168.0.71` 확인, WSL 방화벽 규칙 확인 |
 | 로봇이 RViz에서 안 움직임 | teleop 미실행 또는 Fixed Frame 설정 | teleop 실행 + Fixed Frame을 `odom`으로 설정 |
 | SLAM에서 odom 위치가 안 변함 | rf2o가 /scan 수신 못함 | `ros2 topic echo /scan --once`로 LiDAR 데이터 확인, `laser_frame_id` 파라미터 확인 |
 | RPi에서 rf2o 빌드 중 멈춤 | RAM 부족 (C++ Eigen 컴파일) | 2GB 스왑 추가 후 `colcon build --parallel-workers 1` |
 | 로봇팔 토크 걸리지만 안 움직임 | 전압 부족 (5V) | UPS BAT 포트에서 12V 공급. 5V 포트 사용 불가 |
-| 팔 관절 움직이면 그리퍼 토크 풀림 | `roarm_driver` 미업데이트 | RPi에서 `ugv_bringup` 리빌드 |
+| 팔 관절 움직이면 그리퍼 토크 풀림 | `roarm_driver` 미업데이트 | RPi에서 `ugv_cpp_nodes` 리빌드 |
 | roarm_driver SerialException | 시리얼 포트 다중 접근 | 수동 테스트 스크립트 종료 후 launch 재시작 |
 | 바닥에서 제자리 회전 안 됨 | 스키드 스티어 마찰 | `angular_scale` 파라미터 증가 (기본 2.5) |
 | 직진 시 한쪽으로 치우침 | 좌/우 바퀴 저항 차이 | 모터 교체 또는 하드웨어 점검 |
 | WSL2에서 RViz 크래시 | GPU 호환성 | `LIBGL_ALWAYS_SOFTWARE=1` 환경변수 설정 |
 | 그리퍼 방향 반대 | roarm_driver 버전 불일치 | RPi에서 git pull + 리빌드 |
 | rf2o "Waiting for laser_scans..." 멈춤 | `init_pose_from_topic` 기본값이 존재하지 않는 토픽 | launch에서 `'init_pose_from_topic': ''` 설정 (빈 문자열) |
-| Nav2 "Failed to find a free participant index" | CycloneDDS 참가자 한도 초과 | `cyclonedds.xml`에 `MaxAutoParticipantIndex: 120` 추가 |
+| Nav2 "Failed to find a free participant index" | DDS 참가자 한도 초과 | FastDDS 설정에서 참가자 수 제한 확인 |
 | RViz에서 맵이 안 보임 (Nav2) | Map 토픽 QoS 불일치 | RViz Map display의 Durability Policy를 `Transient Local`로 설정 |
 | Nav2 Goal 후 로봇이 안 움직임 | 모터 데드밴드보다 낮은 속도 명령 | `nav2_params.yaml`에서 `min_vel_x`, `min_speed_xy` 증가 (0.05 이상) |
 | Nav2 회전 후 AMCL 위치 틀어짐 | rf2o odom drift + AMCL 업데이트 느림 | `update_min_a: 0.05`, `alpha1/2/4: 0.5`로 설정, 파티클 수 증가 |

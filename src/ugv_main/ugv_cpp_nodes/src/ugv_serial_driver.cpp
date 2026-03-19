@@ -1,42 +1,134 @@
 /// @file ugv_serial_driver.cpp
-/// @brief UGV 바퀴/팬틸트/LED 시리얼 드라이버 구현
+/// @brief UGV 바퀴/팬틸트/LED 시리얼 드라이버 + 센서 피드백 구현
 ///
-/// ## 통신 흐름 (cmd_vel → 바퀴 모터)
+/// ## 통신 흐름
 ///
+/// ### 명령 전송 (cmd_vel → 바퀴 모터)
 /// ```
-/// [ROS2 /cmd_vel 토픽]
-///       ↓ (UgvDriverNode가 수신)
-/// [angular_scale 적용, 최소 각속도 보정]
-///       ↓
-/// [UgvSerialDriver::set_velocity()]
-///       ↓
-/// [시리얼 전송: {"T":"13","X":0.5,"Z":0.2}\n]
-///       ↓
-/// [ESP32 → 모터 PWM 출력 → 바퀴 회전]
+/// [ROS2 /cmd_vel]  →  [UgvDriverNode]  →  [UgvSerialDriver::set_velocity()]
+///                                              ↓ T:13 JSON
+///                                          [ESP32 → 모터]
 /// ```
 ///
-/// 이 과정은 단방향이며, ESP32는 명령 수신 즉시 모터를 제어합니다.
-/// 응답을 기다리지 않으므로 지연이 최소화됩니다.
+/// ### 센서 피드백 (ESP32 → ROS2 토픽)
+/// ```
+/// [ESP32 T:1001 연속 전송]  →  [feedback_loop() 스레드]  →  [UgvDriverNode]
+///                                                              ↓
+///                                                    [/imu/data, /voltage, /odom/odom_raw]
+/// ```
+///
+/// Linux에서 같은 fd에 대한 read()와 write()는 독립적인 커널 버퍼를 사용하므로
+/// 피드백 스레드의 read와 명령 전송의 write가 동시에 안전하게 동작합니다.
 
 #include "ugv_cpp_nodes/ugv_serial_driver.hpp"
 
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
 
 namespace ugv {
 
 UgvSerialDriver::UgvSerialDriver(const std::string& port, int baud_rate)
     : serial_(port, baud_rate) {}
 
+UgvSerialDriver::~UgvSerialDriver() {
+    feedback_running_ = false;
+    if (feedback_thread_.joinable()) {
+        feedback_thread_.join();
+    }
+}
+
 bool UgvSerialDriver::connect() {
     return serial_.open();
 }
 
 void UgvSerialDriver::disconnect() {
+    feedback_running_ = false;
+    if (feedback_thread_.joinable()) {
+        feedback_thread_.join();
+    }
     serial_.close();
 }
 
 bool UgvSerialDriver::is_connected() const {
     return serial_.is_open();
+}
+
+// === 센서 피드백 ===
+
+void UgvSerialDriver::enable_feedback() {
+    // ESP32에 연속 피드백 모드 활성화 명령 전송
+    send_command(R"({"T":131,"cmd":1})");
+
+    // 피드백 읽기 스레드 시작
+    feedback_running_ = true;
+    feedback_thread_ = std::thread(&UgvSerialDriver::feedback_loop, this);
+}
+
+std::optional<UgvFeedback> UgvSerialDriver::get_feedback() {
+    std::lock_guard<std::mutex> lock(feedback_mutex_);
+    auto fb = latest_feedback_;
+    latest_feedback_.reset();
+    return fb;
+}
+
+void UgvSerialDriver::feedback_loop() {
+    while (feedback_running_) {
+        // read_line은 뮤텍스 없이 호출 — rx 버퍼는 tx와 독립적
+        std::string line = serial_.read_line(200);
+        if (line.empty()) continue;
+
+        auto fb = parse_feedback(line);
+        if (fb) {
+            std::lock_guard<std::mutex> lock(feedback_mutex_);
+            latest_feedback_ = fb;
+        }
+    }
+}
+
+std::optional<UgvFeedback> UgvSerialDriver::parse_feedback(const std::string& line) {
+    // T:1001이 포함되지 않은 라인은 무시
+    if (line.find("1001") == std::string::npos) return std::nullopt;
+
+    // JSON 키에서 숫자 값을 추출하는 람다.
+    // "key": 패턴이 {나 , 뒤에 올 때만 매칭하여
+    // "p"가 "temp" 안에서 잘못 매칭되는 것을 방지합니다.
+    auto extract = [&](const char* key) -> std::optional<double> {
+        char pattern[32];
+        std::snprintf(pattern, sizeof(pattern), "\"%s\":", key);
+
+        size_t pos = 0;
+        while (true) {
+            pos = line.find(pattern, pos);
+            if (pos == std::string::npos) return std::nullopt;
+            // 키 앞이 { 또는 , 인지 확인 (완전한 키 매칭)
+            if (pos == 0 || line[pos - 1] == '{' || line[pos - 1] == ',') {
+                break;
+            }
+            pos += std::strlen(pattern);
+        }
+        pos += std::strlen(pattern);
+        while (pos < line.size() && line[pos] == ' ') pos++;
+
+        char* end;
+        double val = std::strtod(line.c_str() + pos, &end);
+        if (end == line.c_str() + pos) return std::nullopt;
+        return val;
+    };
+
+    UgvFeedback fb;
+    auto t = extract("T");
+    if (!t || static_cast<int>(*t) != 1001) return std::nullopt;
+
+    auto L = extract("L"); if (L) fb.L = static_cast<int>(*L);
+    auto R = extract("R"); if (R) fb.R = static_cast<int>(*R);
+    auto r = extract("r"); if (r) fb.r = *r;
+    auto p = extract("p"); if (p) fb.p = *p;
+    auto y = extract("y"); if (y) fb.y = *y;
+    auto temp = extract("temp"); if (temp) fb.temp = *temp;
+    auto v = extract("v"); if (v) fb.v = *v;
+
+    return fb;
 }
 
 /// 바퀴 속도 명령을 ESP32에 전송합니다 (T:13).

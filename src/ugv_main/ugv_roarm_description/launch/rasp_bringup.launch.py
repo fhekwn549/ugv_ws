@@ -1,5 +1,6 @@
 import os
 from launch import LaunchDescription
+from launch.actions import SetEnvironmentVariable
 from launch.substitutions import Command
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
@@ -23,21 +24,13 @@ def generate_launch_description():
         parameters=[{'robot_description': robot_description}]
     )
 
-    # 2. UGV Bringup — ESP32 sensor feedback (IMU, encoder, voltage)
-    ugv_bringup_node = Node(
-        package='ugv_bringup',
-        executable='ugv_bringup',
-        name='ugv_bringup',
-        output='screen',
-    )
-
-    # 3. UGV Driver — /cmd_vel -> ESP32 motor commands (C++)
+    # 2. UGV Driver (C++) — 제어 + 센서 피드백 통합
+    # (기존 ugv_bringup + ugv_driver를 하나의 C++ 노드로 통합)
     ugv_driver_node = Node(
         package='ugv_cpp_nodes',
         executable='ugv_driver_node',
         name='ugv_driver',
         output='screen',
-        parameters=[],
     )
 
     # 4. rf2o_laser_odometry — LiDAR scan-based odometry + odom -> base_footprint TF
@@ -112,9 +105,12 @@ def generate_launch_description():
                    'base_lidar_link', 'base_laser']
     )
 
+    # FastDDS 사용 (CycloneDDS의 serdata 경고 제거)
+    use_fastdds = SetEnvironmentVariable('RMW_IMPLEMENTATION', 'rmw_fastrtps_cpp')
+
     return LaunchDescription([
+        use_fastdds,
         robot_state_publisher_node,
-        ugv_bringup_node,
         ugv_driver_node,
         rf2o_node,
         roarm_driver_node,
