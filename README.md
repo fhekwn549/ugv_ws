@@ -173,13 +173,22 @@ colcon build --packages-select ugv_cpp_nodes ugv_roarm_description ugv_descripti
 source install/setup.bash
 ```
 
-### 3. CycloneDDS 설정 (WSL → RPi 통신)
+### 3. DDS 설정
 
-WSL2는 NAT 모드라 DDS 멀티캐스트가 안 됩니다. CycloneDDS에 RPi 피어를 명시해야 합니다:
+`RMW_IMPLEMENTATION`은 **워크스페이스별 ament env-hook**으로 자동 전환됩니다:
+
+```
+source ~/ugv_ws/install/setup.bash   → rmw_cyclonedds_cpp (CycloneDDS)
+source ~/gmoma_ws/install/setup.bash → rmw_fastrtps_cpp   (FastDDS)
+```
+
+설정 파일: `ugv_nav/env-hooks/rmw_implementation.sh`
+`.bashrc`에 `RMW_IMPLEMENTATION`을 직접 설정할 필요 없습니다.
+
+WSL2는 NAT 모드라 DDS 멀티캐스트가 안 되므로, CycloneDDS에 RPi 피어를 명시해야 합니다:
 
 ```bash
 # bashrc에 추가
-export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 export CYCLONEDDS_URI=file://$HOME/ugv_ws/src/ugv_main/ugv_bridge/config/cyclonedds.xml
 ```
 
@@ -304,7 +313,7 @@ Node(package='ugv_bringup', executable='roarm_driver', name='roarm_driver')
 |------|------|
 | OS | Ubuntu 22.04 (RPi arm64 / WSL2 x86) |
 | ROS 2 | Humble |
-| DDS | CycloneDDS (`rmw_cyclonedds_cpp`) |
+| DDS | CycloneDDS (`rmw_cyclonedds_cpp`) — ament env-hook으로 워크스페이스별 자동 전환 |
 | 시리얼 | POSIX termios (C++) |
 | 메시지 브로커 | RabbitMQ (MQTT + STOMP + WebSocket) |
 | 웹 브릿지 | paho-mqtt + FastAPI |
