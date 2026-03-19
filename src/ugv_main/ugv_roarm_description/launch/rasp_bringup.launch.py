@@ -107,13 +107,12 @@ def generate_launch_description():
 
     # CycloneDDS 사용 (FastDDS 2.6.x/Humble는 대형 메시지에서
     # "sequence size exceeds remaining buffer" 문제 있음. Iron+ 에서 개선 예정)
+    # serdata 경고는 rcutils stderr로 출력되어 환경변수로 억제 불가.
+    # 필터링 실행: ugv-launch alias 참고 (grep -v serdata)
     use_cyclonedds = SetEnvironmentVariable('RMW_IMPLEMENTATION', 'rmw_cyclonedds_cpp')
-    # CycloneDDS serdata 경고 억제 (기능 무관한 로그 노이즈)
-    suppress_serdata = SetEnvironmentVariable('CYCLONEDDS_LOG_LEVEL', 'fatal')
 
     return LaunchDescription([
         use_cyclonedds,
-        suppress_serdata,
         robot_state_publisher_node,
         ugv_driver_node,
         rf2o_node,
