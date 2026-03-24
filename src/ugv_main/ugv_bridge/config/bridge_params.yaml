@@ -8,8 +8,8 @@ bridge_node:
     # When RPi uses ROS namespace, set the matching prefix here
     ugv01_topic_prefix: ""
 
-    # ── MQTT broker (runs on this central server) ──
-    mqtt_host: "127.0.0.1"
+    # ── MQTT broker (central RabbitMQ on WSL) ──
+    mqtt_host: "192.168.0.85"
     mqtt_port: 1883
     mqtt_keepalive: 60
 
