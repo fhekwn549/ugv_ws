@@ -173,6 +173,7 @@ class MqttBridge:
             "voltage": 1.0 / max(self._voltage_rate, 0.1),
             "joints": 1.0 / max(self._joint_rate, 0.1),
             "scan": 1.0 / max(self._scan_rate, 0.1),
+            "imu": 1.0 / max(self._pose_rate, 0.1),
             "map_pose": 1.0 / max(self._pose_rate, 0.1),
         }
         last = {k: 0.0 for k in intervals}
@@ -187,6 +188,11 @@ class MqttBridge:
             if now - last["pose"] >= intervals["pose"]:
                 self._publish_json("pose", self._state.snapshot_pose(), qos=0)
                 last["pose"] = now
+
+            # IMU
+            if now - last["imu"] >= intervals["imu"]:
+                self._publish_json("imu", self._state.snapshot_imu(), qos=0)
+                last["imu"] = now
 
             # Voltage
             if now - last["voltage"] >= intervals["voltage"]:

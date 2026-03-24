@@ -148,6 +148,10 @@ class RobotState:
                 "angular_vel": round(self.velocity.angular, 4),
             }
 
+    def snapshot_imu(self) -> dict:
+        with self._lock:
+            return {"yaw": round(self.imu_yaw, 4)}
+
     def snapshot_voltage(self) -> dict:
         with self._lock:
             return {"voltage": round(self.battery, 2)}
