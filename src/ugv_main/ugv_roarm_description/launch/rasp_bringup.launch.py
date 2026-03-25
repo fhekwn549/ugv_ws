@@ -86,12 +86,15 @@ def generate_launch_description():
         }],
     )
 
-    # 7. UGV Bridge — MQTT + REST API bridge for web dashboard
+    # 7. UGV Bridge — STOMP + REST API bridge for web dashboard
+    bridge_params = os.path.join(
+        get_package_share_directory('ugv_bridge'), 'config', 'bridge_params.yaml')
     bridge_node = Node(
         package='ugv_bridge',
         executable='bridge_node',
         name='ugv_bridge',
         output='screen',
+        parameters=[bridge_params],
     )
 
     # 8. Static TF: base_lidar_link → base_laser
