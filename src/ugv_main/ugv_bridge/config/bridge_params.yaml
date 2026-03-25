@@ -25,10 +25,10 @@
     static_dir: ""
 
     # ── Publishing rates (Hz) ──
-    pose_rate: 10.0
-    voltage_rate: 1.0
-    joint_rate: 5.0
-    scan_rate: 5.0
+    pose_rate: 2.0
+    voltage_rate: 0.2
+    joint_rate: 2.0
+    scan_rate: 1.0
     sensor_snapshot_interval: 10.0
 
     # LiDAR downsampling: keep every Nth point
