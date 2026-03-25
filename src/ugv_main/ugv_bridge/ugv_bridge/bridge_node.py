@@ -1,7 +1,7 @@
 """Main entry point: multi-robot fleet bridge.
 
 Runs on a central server. Communicates with RPi robots via CycloneDDS,
-exposes MQTT + REST API for web UI.
+exposes STOMP + REST API for web UI.
 """
 
 import threading
@@ -15,7 +15,7 @@ import uvicorn
 from .shared_state import RobotState
 from .db_writer import DbWriter
 from .ros_interface import RosInterface
-from .mqtt_bridge import MqttBridge
+from .stomp_bridge import StompBridge
 from .api_app import RobotHandle, create_app
 
 
@@ -25,9 +25,10 @@ class BridgeNode(Node):
 
         # -- declare parameters --
         self.declare_parameter("robot_ids", "ugv01")
-        self.declare_parameter("mqtt_host", "127.0.0.1")
-        self.declare_parameter("mqtt_port", 1883)
-        self.declare_parameter("mqtt_keepalive", 60)
+        self.declare_parameter("stomp_host", "127.0.0.1")
+        self.declare_parameter("stomp_port", 15674)
+        self.declare_parameter("stomp_user", "guest")
+        self.declare_parameter("stomp_password", "guest")
         self.declare_parameter("api_host", "0.0.0.0")
         self.declare_parameter("api_port", 8081)
         self.declare_parameter("db_path", "~/ugv_bridge.db")
@@ -45,9 +46,10 @@ class BridgeNode(Node):
         robot_ids_str = self.get_parameter("robot_ids").value
         robot_ids = [r.strip() for r in robot_ids_str.split(",")]
 
-        mqtt_host = self.get_parameter("mqtt_host").value
-        mqtt_port = self.get_parameter("mqtt_port").value
-        mqtt_keepalive = self.get_parameter("mqtt_keepalive").value
+        stomp_host = self.get_parameter("stomp_host").value
+        stomp_port = self.get_parameter("stomp_port").value
+        stomp_user = self.get_parameter("stomp_user").value
+        stomp_password = self.get_parameter("stomp_password").value
         api_host = self.get_parameter("api_host").value
         api_port = self.get_parameter("api_port").value
         db_path = self.get_parameter("db_path").value
@@ -67,7 +69,7 @@ class BridgeNode(Node):
 
         # -- per-robot instances --
         self._robots: dict[str, RobotHandle] = {}
-        self._mqtt_bridges: list[MqttBridge] = []
+        self._stomp_bridges: list[StompBridge] = []
 
         for rid in robot_ids:
             # Read optional per-robot topic prefix
@@ -79,9 +81,11 @@ class BridgeNode(Node):
             ros_if = RosInterface(self, rid, topic_prefix, state, self._db)
             self._robots[rid] = RobotHandle(rid, state, ros_if)
 
-            mqtt_br = MqttBridge(
-                mqtt_host, mqtt_port, mqtt_keepalive,
+            stomp_br = StompBridge(
+                stomp_host, stomp_port,
                 rid, state, ros_if,
+                user=stomp_user,
+                password=stomp_password,
                 logger=self.get_logger(),
                 pose_rate=pose_rate,
                 voltage_rate=voltage_rate,
@@ -90,8 +94,8 @@ class BridgeNode(Node):
                 scan_downsample=scan_downsample,
                 cmd_vel_timeout=cmd_vel_timeout,
             )
-            mqtt_br.start()
-            self._mqtt_bridges.append(mqtt_br)
+            stomp_br.start()
+            self._stomp_bridges.append(stomp_br)
 
             self.get_logger().info(
                 f"Robot '{rid}' registered (topic_prefix='{topic_prefix}')")
@@ -107,7 +111,8 @@ class BridgeNode(Node):
 
         self.get_logger().info(
             f"Bridge started: {len(robot_ids)} robot(s), "
-            f"API={api_host}:{api_port}, MQTT={mqtt_host}:{mqtt_port}")
+            f"API={api_host}:{api_port}, "
+            f"STOMP=ws://{stomp_host}:{stomp_port}/ws")
 
     def _snapshot_cb(self):
         for rid, rh in self._robots.items():
@@ -126,8 +131,8 @@ class BridgeNode(Node):
         server.run()
 
     def destroy_node(self):
-        for mb in self._mqtt_bridges:
-            mb.stop()
+        for sb in self._stomp_bridges:
+            sb.stop()
         self._db.stop()
         super().destroy_node()
 

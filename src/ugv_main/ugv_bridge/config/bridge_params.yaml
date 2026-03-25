@@ -8,10 +8,11 @@ bridge_node:
     # When RPi uses ROS namespace, set the matching prefix here
     ugv01_topic_prefix: ""
 
-    # ── MQTT broker (central RabbitMQ on WSL) ──
-    mqtt_host: "192.168.0.85"
-    mqtt_port: 1883
-    mqtt_keepalive: 60
+    # ── STOMP broker (RabbitMQ Web STOMP on WSL) ──
+    stomp_host: "192.168.0.85"
+    stomp_port: 15674
+    stomp_user: "stomp-mq"
+    stomp_password: "stomp-mq"
 
     # ── FastAPI server ──
     api_host: "0.0.0.0"
