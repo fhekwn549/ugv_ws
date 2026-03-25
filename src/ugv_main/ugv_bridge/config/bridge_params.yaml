@@ -1,4 +1,4 @@
-bridge_node:
+/**:
   ros__parameters:
     # ── Robot fleet configuration ──
     # Comma-separated robot IDs
