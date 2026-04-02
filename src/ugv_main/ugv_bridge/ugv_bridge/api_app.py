@@ -5,7 +5,6 @@ import json
 import time
 import logging
 
-import httpx
 from fastapi import FastAPI, Depends, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
