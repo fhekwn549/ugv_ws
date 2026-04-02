@@ -204,21 +204,47 @@ export CYCLONEDDS_URI=file://$HOME/ugv_ws/src/ugv_main/ugv_bridge/config/cyclone
 
 ```bash
 ssh pi@192.168.0.71
-
-# CycloneDDS serdata 경고 필터링하여 실행
-source ~/ugv_ws/install/setup.bash
-ros2 launch ugv_roarm_description rasp_bringup.launch.py 2>&1 | grep -v serdata
+ugv-launch
 ```
 
-> **serdata 경고**: CycloneDDS의 `deserialize failed` 경고가 stderr로 대량 출력됩니다.
-> `rcutils` 로깅이라 환경변수로 억제 불가하므로, `grep -v serdata`로 필터링합니다.
+> `ugv-launch`는 `~/.bashrc`에 등록된 alias입니다:
+> ```
+> ros2 launch ugv_roarm_description rasp_bringup.launch.py 2>&1 | grep -v -E "serdata|rcutils_reset_error|error state is being overwritten|..."
+> ```
+> CycloneDDS의 `deserialize failed` 경고 등을 필터링합니다.
+
+### RPi: Nav2 자율주행 (별도 터미널)
+
+```bash
+ssh pi@192.168.0.71
+ugv-nav
+```
+
+> `ugv-nav`는 `~/.bashrc`에 등록된 alias입니다:
+> ```
+> ros2 launch ugv_roarm_description nav_real.launch.py pbstream:=/home/pi/maps/lab_map.pbstream 2>&1 | grep -v -E "serdata|rcutils_reset_error|..."
+> ```
+
+> Nav2는 DDS 파티시펀트를 많이 생성합니다.
+> `cyclonedds_local.xml`에 `MaxAutoParticipantIndex: 200`이 설정되어 있습니다.
+
+### RPi: alias 등록 (최초 1회)
+
+```bash
+cat >> ~/.bashrc << 'ALIASES'
+alias ugv-launch='ros2 launch ugv_roarm_description rasp_bringup.launch.py 2>&1 | grep -v -E "serdata|rcutils_reset_error|error state is being overwritten|with this new error message|error_handling.c|>>>|<<<"'
+alias ugv-nav='ros2 launch ugv_roarm_description nav_real.launch.py pbstream:=/home/pi/maps/lab_map.pbstream 2>&1 | grep -v -E "serdata|rcutils_reset_error|error state is being overwritten|with this new error message|error_handling.c|>>>|<<<"'
+ALIASES
+source ~/.bashrc
+```
 
 ### WSL: 대시보드
 
 ```bash
-cd ~/ugv_dashboard && npm run dev
-# → http://localhost:5173 접속
-# → .env의 VITE_ROBOT_HOST=192.168.0.71 확인
+# 윈도우 터미널에서 실행
+cd C:\Users\User\Desktop\com.ubisam.boilerplate.frontend
+npm run dev.robot
+# → http://localhost:3000 접속
 ```
 
 ### WSL: RViz 시각화 (선택)
@@ -226,14 +252,6 @@ cd ~/ugv_dashboard && npm run dev
 ```bash
 source ~/ugv_ws/install/setup.bash
 ros2 launch ugv_roarm_description remote_view.launch.py
-```
-
-### Nav2 자율주행 (RPi 별도 터미널)
-
-```bash
-source ~/ugv_ws/install/setup.bash
-ros2 launch ugv_roarm_description nav_real.launch.py \
-  pbstream:=/home/pi/maps/lab_map.pbstream
 ```
 
 > Nav2는 DDS 파티시펀트를 많이 생성합니다.
