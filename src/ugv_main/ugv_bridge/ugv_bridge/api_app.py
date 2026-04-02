@@ -3,15 +3,21 @@
 import base64
 import json
 import time
+import logging
 
-from fastapi import FastAPI, Query, Request
+import httpx
+from fastapi import FastAPI, Depends, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.staticfiles import StaticFiles
+from jwt import PyJWKClient, decode as jwt_decode
 
 from .shared_state import RobotState
 from .ros_interface import RosInterface
 from .db_writer import DbWriter
+
+logger = logging.getLogger(__name__)
 
 
 class RobotHandle:
@@ -26,7 +32,7 @@ class RobotHandle:
 
 
 def create_app(robots: dict[str, RobotHandle], db: DbWriter,
-               static_dir: str = "") -> FastAPI:
+               static_dir: str = "", oauth2_jwks_uri: str = "") -> FastAPI:
 
     app = FastAPI(title="UGV Bridge API", version="0.2.0")
 
@@ -36,6 +42,32 @@ def create_app(robots: dict[str, RobotHandle], db: DbWriter,
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # -- OAuth2 JWT verification --
+
+    security = HTTPBearer(auto_error=False)
+    jwk_client = PyJWKClient(oauth2_jwks_uri) if oauth2_jwks_uri else None
+
+    async def verify_token(
+        cred: HTTPAuthorizationCredentials | None = Depends(security),
+    ):
+        if not jwk_client:
+            return None  # OAuth2 disabled
+        if not cred:
+            raise JSONResponse(status_code=401, content={"error": "missing token"})
+        try:
+            signing_key = jwk_client.get_signing_key_from_jwt(cred.credentials)
+            payload = jwt_decode(
+                cred.credentials,
+                signing_key.key,
+                algorithms=["RS256"],
+                options={"verify_aud": False},
+            )
+            return payload
+        except Exception as e:
+            logger.warning("JWT verification failed: %s", e)
+            from fastapi import HTTPException
+            raise HTTPException(status_code=401, detail="invalid token")
 
     # -- helper --
 
@@ -78,7 +110,7 @@ def create_app(robots: dict[str, RobotHandle], db: DbWriter,
         return {"status": "ok", "robots": list(robots.keys())}
 
     @app.get("/api/robots")
-    async def list_robots():
+    async def list_robots(_=Depends(verify_token)):
         result = []
         for rid, rh in robots.items():
             snap = rh.state.snapshot_full()
@@ -88,14 +120,14 @@ def create_app(robots: dict[str, RobotHandle], db: DbWriter,
     # -- per-robot endpoints --
 
     @app.get("/api/{robot_id}/status")
-    async def status(robot_id: str):
+    async def status(robot_id: str, _=Depends(verify_token)):
         rh = get_robot(robot_id)
         if not rh:
             return JSONResponse({"error": "unknown robot"}, 404)
         return rh.state.snapshot_full()
 
     @app.get("/api/{robot_id}/map")
-    async def get_map(robot_id: str):
+    async def get_map(robot_id: str, _=Depends(verify_token)):
         rh = get_robot(robot_id)
         if not rh:
             return JSONResponse({"error": "unknown robot"}, 404)
@@ -115,7 +147,7 @@ def create_app(robots: dict[str, RobotHandle], db: DbWriter,
         }
 
     @app.post("/api/{robot_id}/navigate")
-    async def navigate(robot_id: str, request: Request):
+    async def navigate(robot_id: str, request: Request, _=Depends(verify_token)):
         rh = get_robot(robot_id)
         if not rh:
             return JSONResponse({"error": "unknown robot"}, 404)
@@ -129,7 +161,7 @@ def create_app(robots: dict[str, RobotHandle], db: DbWriter,
         return JSONResponse({"error": "nav2 unavailable"}, 503)
 
     @app.post("/api/{robot_id}/cancel")
-    async def cancel_nav(robot_id: str):
+    async def cancel_nav(robot_id: str, _=Depends(verify_token)):
         rh = get_robot(robot_id)
         if not rh:
             return JSONResponse({"error": "unknown robot"}, 404)
@@ -137,7 +169,7 @@ def create_app(robots: dict[str, RobotHandle], db: DbWriter,
         return {"canceled": ok}
 
     @app.post("/api/{robot_id}/initial_pose")
-    async def initial_pose(robot_id: str, request: Request):
+    async def initial_pose(robot_id: str, request: Request, _=Depends(verify_token)):
         rh = get_robot(robot_id)
         if not rh:
             return JSONResponse({"error": "unknown robot"}, 404)
@@ -150,7 +182,7 @@ def create_app(robots: dict[str, RobotHandle], db: DbWriter,
         return {"status": "ok"}
 
     @app.post("/api/{robot_id}/cmd_vel")
-    async def cmd_vel(robot_id: str, request: Request):
+    async def cmd_vel(robot_id: str, request: Request, _=Depends(verify_token)):
         rh = get_robot(robot_id)
         if not rh:
             return JSONResponse({"error": "unknown robot"}, 404)
@@ -162,7 +194,7 @@ def create_app(robots: dict[str, RobotHandle], db: DbWriter,
         return {"status": "ok"}
 
     @app.post("/api/{robot_id}/arm")
-    async def arm(robot_id: str, request: Request):
+    async def arm(robot_id: str, request: Request, _=Depends(verify_token)):
         rh = get_robot(robot_id)
         if not rh:
             return JSONResponse({"error": "unknown robot"}, 404)
@@ -172,7 +204,7 @@ def create_app(robots: dict[str, RobotHandle], db: DbWriter,
         return {"status": "ok"}
 
     @app.post("/api/{robot_id}/gripper")
-    async def gripper(robot_id: str, request: Request):
+    async def gripper(robot_id: str, request: Request, _=Depends(verify_token)):
         rh = get_robot(robot_id)
         if not rh:
             return JSONResponse({"error": "unknown robot"}, 404)
@@ -189,6 +221,7 @@ def create_app(robots: dict[str, RobotHandle], db: DbWriter,
         limit: int = Query(50, ge=1, le=500),
         since: str | None = Query(None),
         level: str | None = Query(None),
+        _=Depends(verify_token),
     ):
         if robot_id not in robots:
             return JSONResponse({"error": "unknown robot"}, 404)
@@ -198,7 +231,8 @@ def create_app(robots: dict[str, RobotHandle], db: DbWriter,
 
     @app.get("/api/{robot_id}/logs/navigation")
     async def get_nav_logs(robot_id: str,
-                           limit: int = Query(20, ge=1, le=200)):
+                           limit: int = Query(20, ge=1, le=200),
+                           _=Depends(verify_token)):
         if robot_id not in robots:
             return JSONResponse({"error": "unknown robot"}, 404)
         return {"logs": db.query_navigation(robot_id, limit)}

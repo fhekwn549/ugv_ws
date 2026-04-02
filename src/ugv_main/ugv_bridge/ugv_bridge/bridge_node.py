@@ -41,6 +41,7 @@ class BridgeNode(Node):
         self.declare_parameter("cmd_vel_timeout", 0.5)
         self.declare_parameter("sensor_snapshot_interval", 10.0)
         self.declare_parameter("db_retention_days", 30)
+        self.declare_parameter("oauth2_jwks_uri", "")
 
         # -- read parameters --
         robot_ids_str = self.get_parameter("robot_ids").value
@@ -101,7 +102,8 @@ class BridgeNode(Node):
                 f"Robot '{rid}' registered (topic_prefix='{topic_prefix}')")
 
         # -- FastAPI --
-        self._app = create_app(self._robots, self._db, static_dir)
+        oauth2_jwks_uri = self.get_parameter("oauth2_jwks_uri").value
+        self._app = create_app(self._robots, self._db, static_dir, oauth2_jwks_uri)
         self._api_host = api_host
         self._api_port = api_port
 
