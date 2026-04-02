@@ -1,53 +1,67 @@
 # ugv_ws
 
-> [waveshareteam/ugv_ws](https://github.com/waveshareteam/ugv_ws) 포크 - C++ 실시간 드라이버 + MQTT 웹 브릿지 통합
+> [waveshareteam/ugv_ws](https://github.com/waveshareteam/ugv_ws) 포크 — C++ 실시간 드라이버 + STOMP 웹 브릿지 통합
 
 UGV Wave Rover + RoArm-M2 로봇팔을 구동하는 ROS 2 워크스페이스입니다.
-RPi에서 하드웨어를 직접 제어하고, MQTT를 통해 웹 대시보드와 연동합니다.
+RPi에서 하드웨어를 직접 제어하고, STOMP/WebSocket을 통해 웹 대시보드와 연동합니다.
 
 ## 시스템 아키텍처
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│  웹 대시보드 (ugv_dashboard)                                  │
-│  Vue 3 + Three.js(3D URDF) + STOMP/WebSocket                │
-│  맵/Nav2 목표 | LiDAR 2D | 팔/바퀴/그리퍼 제어 | 상태 패널   │
-└──────────┬───────────────────────────────────────────────────┘
-           │ STOMP/WS (:15674)
-           │ 제어: cmd_vel, arm, gripper, navigate, cancel
-           │ 상태: pose, joints, scan, voltage
-┌──────────▼───────────────────────────────────────────────────┐
-│  RPi: ugv_bridge (ROS 2 노드)                                │
-│  paho-mqtt → ROS 2 토픽 변환 | FastAPI (맵/로그 REST)        │
-│  RabbitMQ: MQTT:1883 + STOMP:61613 + Web STOMP:15674         │
-└──────────┬───────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│  웹 대시보드 (ugv-frontend, boilerplate 02_robot)                │
+│  Vue 3 + Vuetify + Three.js(3D URDF) + stompjs                 │
+│  Light/Dark 테마 | MoveIt2 스타일 ghost arm preview              │
+└──────────┬────────────────────────────┬─────────────────────────┘
+           │ STOMP/WS                   │ REST (맵 PNG)
+           │ (stomp-web 프록시 경유)      │ (FastAPI 직접)
+┌──────────▼────────────────────┐       │
+│  Docker (윈도우)               │       │
+│  stomp-web(:9030) ← OAuth2    │       │
+│  oauth2-web(:9020)            │       │
+│  RabbitMQ(:15674 Web STOMP)   │       │
+│  Spring Boot(:8080)           │       │
+└──────────┬────────────────────┘       │
+           │ STOMP/WS (:15674)          │
+┌──────────▼────────────────────────────▼─────────────────────────┐
+│  RPi: ugv_bridge (ROS 2 Python 노드)                            │
+│  python-stomp-client → ROS 2 토픽 변환 | FastAPI (:8081) REST   │
+└──────────┬──────────────────────────────────────────────────────┘
            │ ROS 2 토픽 (CycloneDDS)
-┌──────────▼───────────────────────────────────────────────────┐
-│  RPi ROS 2 노드                                              │
-│                                                               │
-│  ┌─────────────────┐  ┌──────────────────┐  ┌─────────────┐ │
-│  │ ugv_driver_node  │  │ roarm_driver_node│  │ ldlidar_node│ │
-│  │ (C++)            │  │ (C++)            │  │ (C++)       │ │
-│  │ cmd_vel→모터     │  │ joint_traj→팔    │  │ /scan       │ │
-│  │ imu/voltage/odom │  │ gripper→T:106    │  │             │ │
-│  └────────┬─────────┘  └────────┬─────────┘  └──────┬──────┘ │
-│           │ serial              │ serial             │ serial │
-│  ┌────────▼─────────┐  ┌───────▼──────────┐  ┌──────▼──────┐ │
-│  │ /dev/ttyAMA0     │  │ /dev/ttyUSB0     │  │ /dev/ttyUSB1│ │
-│  │ UGV 바퀴 ESP32   │  │ RoArm-M2 ESP32   │  │ LDLidar LD19│ │
-│  └──────────────────┘  └──────────────────┘  └─────────────┘ │
-│                                                               │
-│  + robot_state_publisher | rf2o_laser_odometry                │
-│  + Cartographer (SLAM) | Nav2 (자율주행)                      │
-└───────────────────────────────────────────────────────────────┘
+┌──────────▼──────────────────────────────────────────────────────┐
+│  RPi ROS 2 노드                                                  │
+│                                                                   │
+│  ┌─────────────────┐  ┌──────────────────┐  ┌─────────────────┐ │
+│  │ ugv_driver_node  │  │ roarm_driver_node│  │ ldlidar_node    │ │
+│  │ (C++)            │  │ (C++)            │  │ (C++)           │ │
+│  │ cmd_vel→모터     │  │ joint_traj→팔    │  │ /scan           │ │
+│  │ imu/voltage/odom │  │ gripper→T:106    │  │                 │ │
+│  └────────┬─────────┘  └────────┬─────────┘  └───────┬─────────┘ │
+│           │ serial              │ serial              │ serial   │
+│  ┌────────▼─────────┐  ┌───────▼──────────┐  ┌──────▼────────┐ │
+│  │ /dev/ttyAMA0     │  │ /dev/ttyUSB0     │  │ /dev/ttyUSB1  │ │
+│  │ UGV 바퀴 ESP32   │  │ RoArm-M2 ESP32   │  │ LDLidar LD19  │ │
+│  └──────────────────┘  └──────────────────┘  └───────────────┘ │
+│                                                                   │
+│  + robot_state_publisher | rf2o_laser_odometry                    │
+│  + Cartographer (SLAM) | Nav2 (자율주행)                          │
+└───────────────────────────────────────────────────────────────────┘
 ```
+
+### 통신 경로 요약
+
+| 데이터 | 경로 | 인증 |
+|--------|------|------|
+| 센서/제어 (소량, 빈번) | 브라우저 → stomp-web(:9030, OAuth2) → RabbitMQ → ugv_bridge | OAuth2 (stomp-web이 검증) |
+| 맵 이미지 (대용량, 드물게) | 브라우저 → FastAPI(:8081, RPi) 직접 | 개발: 없음 / 프로덕션: Spring Boot 경유 예정 |
+| 맵 업데이트 알림 | STOMP `map_updated` → stomp-web 경유 | OAuth2 |
 
 ## 리포 구성
 
 | 리포 | 역할 |
 |------|------|
-| **이 리포 (`ugv_ws`)** | 하드웨어 드라이버, 센서 처리, MQTT 브릿지, URDF, launch, Nav2 |
-| [ugv_dashboard](https://github.com/fhekwn549/ugv_dashboard) | 웹 대시보드 (Vue 3 + Three.js + STOMP) |
+| **이 리포 (`ugv_ws`)** | 하드웨어 드라이버, 센서 처리, STOMP 브릿지, URDF, launch, Nav2 |
+| [ugv-frontend](https://github.com/ubisamRAD/ugv-frontend) | 웹 대시보드 (boilerplate 02_robot 앱) |
 
 ## 시리얼 포트 매핑 (RPi)
 
@@ -73,6 +87,15 @@ RPi에서 하드웨어를 직접 제어하고, MQTT를 통해 웹 대시보드�
 - **Subscribe**: `/roarm/gripper_cmd` (Float64) → T:106
 - **Publish**: `/joint_states` (JointState) ← T:105 (5Hz)
 
+### ugv_bridge (STOMP + REST 브릿지)
+
+- **STOMP**: python-stomp-client(`SessionImpl`)로 RabbitMQ Web STOMP(:15674)에 연결
+- **REST**: FastAPI(:8081)로 맵 PNG, 로그, 제어 명령 제공
+- **구독 (하향)**: `ugv01.cmd_vel`, `ugv01.arm`, `ugv01.gripper`, `ugv01.navigate`, `ugv01.cancel`, `ugv01.initial_pose`
+- **발행 (상향)**: `ugv01.pose`(5Hz), `ugv01.voltage`(0.2Hz), `ugv01.joint_states`(3Hz), `ugv01.scan`(2Hz, 4x 다운샘플), `ugv01.map_pose`(5Hz), `ugv01.nav_status`, `ugv01.path`
+- **안전장치**: 0.5초 이상 cmd_vel 없으면 자동 정지 명령 발행
+- **OAuth2**: `oauth2_jwks_uri` 파라미터로 JWT 검증 활성화 가능 (현재 개발 환경에서는 비활성화)
+
 ### LiDAR 설정
 
 - Angle Crop: 210~329도 제거 (로봇팔이 가리는 후방)
@@ -93,21 +116,15 @@ RPi에서 하드웨어를 직접 제어하고, MQTT를 통해 웹 대시보드�
 ```bash
 ssh pi@192.168.0.71
 
-# 클론
-cd ~ && git clone -b ros2-humble-develop https://github.com/fhekwn549/ugv_ws.git
+cd ~ && git clone -b ros2-humble-develop https://github.com/ubisamRAD/ugv_ws.git
 
 # ROS 2 의존성
 sudo apt install ros-humble-rmw-cyclonedds-cpp ros-humble-xacro \
   ros-humble-robot-state-publisher ros-humble-joint-state-publisher
 
 # Python 의존성 (ugv_bridge용)
-pip3 install fastapi uvicorn paho-mqtt
-
-# RabbitMQ (MQTT + STOMP 브로커)
-sudo apt install rabbitmq-server
-sudo cp ~/ugv_ws/src/ugv_main/ugv_bridge/config/enabled_plugins /etc/rabbitmq/enabled_plugins
-sudo cp ~/ugv_ws/src/ugv_main/ugv_bridge/config/rabbitmq.conf /etc/rabbitmq/rabbitmq.conf
-sudo systemctl restart rabbitmq-server
+pip3 install fastapi uvicorn "PyJWT[crypto]"
+pip3 install "python-stomp-client @ git+https://github.com/ubisamRAD/python-stomp-client.git@main"
 ```
 
 ### 2. 스왑 추가 (RAM 1GB인 경우)
@@ -136,7 +153,11 @@ cat >> ~/.bashrc << 'EOF'
 source /opt/ros/humble/setup.bash
 source ~/ugv_ws/install/setup.bash
 export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+
+alias ugv-launch='ros2 launch ugv_roarm_description rasp_bringup.launch.py 2>&1 | grep -v -E "serdata|rcutils_reset_error|error state is being overwritten|with this new error message|error_handling.c|>>>|<<<"'
+alias ugv-nav='ros2 launch ugv_roarm_description nav_real.launch.py pbstream:=/home/pi/maps/lab_map.pbstream 2>&1 | grep -v -E "serdata|rcutils_reset_error|error state is being overwritten|with this new error message|error_handling.c|>>>|<<<"'
 EOF
+source ~/.bashrc
 ```
 
 ### 5. USB 포트 권한
@@ -145,6 +166,32 @@ EOF
 sudo usermod -aG dialout pi
 # 재부팅 필요
 ```
+
+---
+
+## 윈도우 Docker 세팅
+
+### 전제 조건
+
+- Docker Desktop 설치 완료
+- `com.ubisam.boilerplate.frontend` 리포 클론 완료
+
+### Docker 서비스 실행
+
+```bash
+cd C:\Users\User\Desktop\com.ubisam.boilerplate.frontend
+docker compose -f Dockerfile-dev.yml up -d
+```
+
+실행되는 서비스:
+
+| 컨테이너 | 포트 | 역할 |
+|----------|------|------|
+| oauth2-web | :9020 | OAuth2 인증 서버 |
+| stomp-web | :9030 | STOMP 프록시 (OAuth2 검증 + RabbitMQ 중계) |
+| stomp-mq | :15674, :15672, :61613 | RabbitMQ (Web STOMP + 관리 UI) |
+| examples-backend | :8080 | Spring Boot 백엔드 |
+| oauth2-db | :5432 | PostgreSQL |
 
 ---
 
@@ -158,7 +205,7 @@ sudo usermod -aG dialout pi
 ### 1. 클론 및 의존성
 
 ```bash
-cd ~ && git clone -b ros2-humble-develop https://github.com/fhekwn549/ugv_ws.git
+cd ~ && git clone -b ros2-humble-develop https://github.com/ubisamRAD/ugv_ws.git
 
 sudo apt install ros-humble-rmw-cyclonedds-cpp ros-humble-xacro \
   ros-humble-robot-state-publisher ros-humble-joint-state-publisher \
@@ -183,7 +230,6 @@ source ~/gmoma_ws/install/setup.bash → rmw_fastrtps_cpp   (FastDDS)
 ```
 
 설정 파일: `ugv_nav/env-hooks/rmw_implementation.sh`
-`.bashrc`에 `RMW_IMPLEMENTATION`을 직접 설정할 필요 없습니다.
 
 WSL2는 NAT 모드라 DDS 멀티캐스트가 안 되므로, CycloneDDS에 RPi 피어를 명시해야 합니다:
 
@@ -198,64 +244,40 @@ export CYCLONEDDS_URI=file://$HOME/ugv_ws/src/ugv_main/ugv_bridge/config/cyclone
 
 ## 매일 실행
 
-### RPi: 로봇 기동
+### 1. Docker 서비스 확인 (윈도우)
 
-> systemd 서비스는 현재 비활성화 상태입니다. SSH로 수동 실행합니다.
+```powershell
+docker ps --format "table {{.Names}}\t{{.Ports}}"
+```
+
+### 2. RPi: 로봇 기동
 
 ```bash
 ssh pi@192.168.0.71
 ugv-launch
 ```
 
-> `ugv-launch`는 `~/.bashrc`에 등록된 alias입니다:
-> ```
-> ros2 launch ugv_roarm_description rasp_bringup.launch.py 2>&1 | grep -v -E "serdata|rcutils_reset_error|error state is being overwritten|..."
-> ```
-> CycloneDDS의 `deserialize failed` 경고 등을 필터링합니다.
-
-### RPi: Nav2 자율주행 (별도 터미널)
+### 3. RPi: Nav2 자율주행 (별도 터미널)
 
 ```bash
 ssh pi@192.168.0.71
 ugv-nav
 ```
 
-> `ugv-nav`는 `~/.bashrc`에 등록된 alias입니다:
-> ```
-> ros2 launch ugv_roarm_description nav_real.launch.py pbstream:=/home/pi/maps/lab_map.pbstream 2>&1 | grep -v -E "serdata|rcutils_reset_error|..."
-> ```
-
-> Nav2는 DDS 파티시펀트를 많이 생성합니다.
-> `cyclonedds_local.xml`에 `MaxAutoParticipantIndex: 200`이 설정되어 있습니다.
-
-### RPi: alias 등록 (최초 1회)
+### 4. 대시보드 (윈도우 터미널)
 
 ```bash
-cat >> ~/.bashrc << 'ALIASES'
-alias ugv-launch='ros2 launch ugv_roarm_description rasp_bringup.launch.py 2>&1 | grep -v -E "serdata|rcutils_reset_error|error state is being overwritten|with this new error message|error_handling.c|>>>|<<<"'
-alias ugv-nav='ros2 launch ugv_roarm_description nav_real.launch.py pbstream:=/home/pi/maps/lab_map.pbstream 2>&1 | grep -v -E "serdata|rcutils_reset_error|error state is being overwritten|with this new error message|error_handling.c|>>>|<<<"'
-ALIASES
-source ~/.bashrc
-```
-
-### WSL: 대시보드
-
-```bash
-# 윈도우 터미널에서 실행
 cd C:\Users\User\Desktop\com.ubisam.boilerplate.frontend
 npm run dev.robot
 # → http://localhost:3000 접속
 ```
 
-### WSL: RViz 시각화 (선택)
+### 5. RViz 시각화 (WSL, 선택)
 
 ```bash
 source ~/ugv_ws/install/setup.bash
 ros2 launch ugv_roarm_description remote_view.launch.py
 ```
-
-> Nav2는 DDS 파티시펀트를 많이 생성합니다.
-> `cyclonedds_local.xml`에 `MaxAutoParticipantIndex: 200`이 설정되어 있습니다.
 
 ---
 
@@ -281,11 +303,11 @@ source install/setup.bash
 ugv_ws/src/
 ├── ugv_main/
 │   ├── ugv_cpp_nodes/          # C++ 실시간 시리얼 드라이버 (ugv_driver, roarm_driver)
-│   ├── ugv_bridge/             # MQTT + REST API 웹 브릿지
+│   ├── ugv_bridge/             # STOMP + REST API 웹 브릿지 (python-stomp-client + FastAPI)
 │   ├── ugv_roarm_description/  # URDF, launch, RViz, Gazebo, Nav2 설정
 │   ├── ugv_description/        # 기본 UGV URDF
 │   ├── ugv_bringup/            # Python 드라이버 (롤백용, 현재 미사용)
-│   ├── ugv_nav/                # Nav2 설정, 맵
+│   ├── ugv_nav/                # Nav2 설정, 맵, DDS env-hook
 │   ├── ugv_interface/          # 커스텀 메시지/서비스
 │   └── ugv_fleet_sim/          # 멀티로봇 시뮬레이션 (개발 중)
 ├── ugv_else/
@@ -333,8 +355,10 @@ Node(package='ugv_bringup', executable='roarm_driver', name='roarm_driver')
 | ROS 2 | Humble |
 | DDS | CycloneDDS (`rmw_cyclonedds_cpp`) — ament env-hook으로 워크스페이스별 자동 전환 |
 | 시리얼 | POSIX termios (C++) |
-| 메시지 브로커 | RabbitMQ (MQTT + STOMP + WebSocket) |
-| 웹 브릿지 | paho-mqtt + FastAPI |
+| 메시지 브로커 | RabbitMQ (STOMP + WebSocket) |
+| STOMP 클라이언트 | python-stomp-client (SessionImpl) |
+| REST API | FastAPI (맵 PNG, 로그) |
+| 인증 | OAuth2 (stomp-web 프록시가 검증, FastAPI는 개발 환경에서 비활성화) |
 | SLAM | Cartographer |
 | 오도메트리 | rf2o (LiDAR 스캔 매칭) |
 | 자율주행 | Nav2 |
