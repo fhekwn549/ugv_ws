@@ -8,6 +8,11 @@ Gazebo 없이 Nav2를 테스트하기 위한 경량 오도메트리 시뮬레이
 /initialpose (RViz "2D Pose Estimate")를 구독하여 위치를 재설정할 수 있습니다.
 
 joint_states도 동일 타임스탬프로 발행하여 TF 동기화 문제(바퀴 진동)를 방지합니다.
+
+Parameters:
+    frame_prefix (str): TF 프레임 접두사 (예: 'ugv01/'). 멀티로봇 시 사용.
+    drive_type (str): 'differential' 또는 'holonomic' (메카넘).
+    joint_names (str[]): joint_states로 발행할 조인트 이름 목록.
 """
 
 import math
@@ -22,22 +27,17 @@ from sensor_msgs.msg import JointState
 from tf2_ros import TransformBroadcaster
 
 
-# All non-fixed joints in ugv_roarm.xacro
-WHEEL_JOINTS = [
+# Default joints for ugv_roarm.xacro (used when joint_names param is empty)
+DEFAULT_JOINTS = [
     'left_up_wheel_link_joint',
     'left_down_wheel_link_joint',
     'right_up_wheel_link_joint',
     'right_down_wheel_link_joint',
-]
-
-ARM_JOINTS = [
     'arm_base_link_to_arm_link1',
     'arm_link1_to_arm_link2',
     'arm_link2_to_arm_link3',
     'arm_link3_to_arm_gripper_link',
 ]
-
-ALL_JOINTS = WHEEL_JOINTS + ARM_JOINTS
 
 
 class FakeOdomNode(Node):
@@ -48,12 +48,31 @@ class FakeOdomNode(Node):
         self.declare_parameter('initial_y', 0.0)
         self.declare_parameter('initial_yaw', 0.0)
         self.declare_parameter('update_rate', 50.0)
+        self.declare_parameter('frame_prefix', '')
+        self.declare_parameter('drive_type', 'differential')
+        self.declare_parameter('joint_names', [])
 
         self.x = self.get_parameter('initial_x').value
         self.y = self.get_parameter('initial_y').value
         self.yaw = self.get_parameter('initial_yaw').value
 
+        self.frame_prefix = self.get_parameter('frame_prefix').value
+        self.drive_type = self.get_parameter('drive_type').value
+        joint_names_param = self.get_parameter('joint_names').value
+        if joint_names_param:
+            self.joint_names = list(joint_names_param)
+        else:
+            # Apply frame_prefix to default joint names (matches prefixed URDF)
+            self.joint_names = [
+                f'{self.frame_prefix}{j}' for j in DEFAULT_JOINTS]
+
+        # Frame IDs (map is always global, odom/base get prefix)
+        self.map_frame = 'map'
+        self.odom_frame = f'{self.frame_prefix}odom'
+        self.base_frame = f'{self.frame_prefix}base_footprint'
+
         self.vx = 0.0
+        self.vy = 0.0
         self.vyaw = 0.0
         self.last_cmd_time = self.get_clock().now()
 
@@ -82,10 +101,12 @@ class FakeOdomNode(Node):
         self.create_timer(1.0 / rate, self._update)
 
         self.get_logger().info(
-            f'Fake odom started at ({self.x:.2f}, {self.y:.2f}, {self.yaw:.2f})')
+            f'Fake odom started at ({self.x:.2f}, {self.y:.2f}, {self.yaw:.2f}) '
+            f'[prefix={self.frame_prefix!r}, drive={self.drive_type}]')
 
     def _cmd_vel_cb(self, msg: Twist):
         self.vx = msg.linear.x
+        self.vy = msg.linear.y if self.drive_type == 'holonomic' else 0.0
         self.vyaw = msg.angular.z
         self.last_cmd_time = self.get_clock().now()
 
@@ -99,6 +120,7 @@ class FakeOdomNode(Node):
         cosy_cosp = 1.0 - 2.0 * (q.y * q.y + q.z * q.z)
         self.yaw = math.atan2(siny_cosp, cosy_cosp)
         self.vx = 0.0
+        self.vy = 0.0
         self.vyaw = 0.0
         self.get_logger().info(
             f'Pose reset to ({self.x:.2f}, {self.y:.2f}, {math.degrees(self.yaw):.1f}°)')
@@ -110,6 +132,7 @@ class FakeOdomNode(Node):
         dt_cmd = (now - self.last_cmd_time).nanoseconds * 1e-9
         if dt_cmd > self.cmd_timeout:
             self.vx = 0.0
+            self.vy = 0.0
             self.vyaw = 0.0
 
         # Integration (fixed timestep)
@@ -117,8 +140,10 @@ class FakeOdomNode(Node):
         self.yaw += self.vyaw * dt
         # Normalize yaw to [-pi, pi]
         self.yaw = math.atan2(math.sin(self.yaw), math.cos(self.yaw))
-        self.x += self.vx * math.cos(self.yaw) * dt
-        self.y += self.vx * math.sin(self.yaw) * dt
+        cos_yaw = math.cos(self.yaw)
+        sin_yaw = math.sin(self.yaw)
+        self.x += (self.vx * cos_yaw - self.vy * sin_yaw) * dt
+        self.y += (self.vx * sin_yaw + self.vy * cos_yaw) * dt
 
         # Quaternion from yaw
         qz = math.sin(self.yaw / 2.0)
@@ -126,18 +151,17 @@ class FakeOdomNode(Node):
 
         stamp = now.to_msg()
 
-        # Publish TF: map → odom (identity) + odom → base_footprint
-        # map → odom을 dynamic TF로 발행하여 costmap의 TF 체인 해석 문제 방지
+        # Publish TF: map → <prefix>odom (identity) + <prefix>odom → <prefix>base_footprint
         map_to_odom = TransformStamped()
         map_to_odom.header.stamp = stamp
-        map_to_odom.header.frame_id = 'map'
-        map_to_odom.child_frame_id = 'odom'
+        map_to_odom.header.frame_id = self.map_frame
+        map_to_odom.child_frame_id = self.odom_frame
         map_to_odom.transform.rotation.w = 1.0
 
         odom_to_base = TransformStamped()
         odom_to_base.header.stamp = stamp
-        odom_to_base.header.frame_id = 'odom'
-        odom_to_base.child_frame_id = 'base_footprint'
+        odom_to_base.header.frame_id = self.odom_frame
+        odom_to_base.child_frame_id = self.base_frame
         odom_to_base.transform.translation.x = self.x
         odom_to_base.transform.translation.y = self.y
         odom_to_base.transform.rotation.z = qz
@@ -145,27 +169,29 @@ class FakeOdomNode(Node):
 
         self.tf_broadcaster.sendTransform([map_to_odom, odom_to_base])
 
-        # Publish /odom
+        # Publish odom message
         odom = Odometry()
         odom.header.stamp = stamp
-        odom.header.frame_id = 'odom'
-        odom.child_frame_id = 'base_footprint'
+        odom.header.frame_id = self.odom_frame
+        odom.child_frame_id = self.base_frame
         odom.pose.pose.position.x = self.x
         odom.pose.pose.position.y = self.y
         odom.pose.pose.orientation.z = qz
         odom.pose.pose.orientation.w = qw
         odom.twist.twist.linear.x = self.vx
+        odom.twist.twist.linear.y = self.vy
         odom.twist.twist.angular.z = self.vyaw
         self.odom_pub.publish(odom)
 
-        # Publish /joint_states (same timestamp → no TF jitter)
-        js = JointState()
-        js.header.stamp = stamp
-        js.name = ALL_JOINTS
-        js.position = [0.0] * len(ALL_JOINTS)
-        js.velocity = []
-        js.effort = []
-        self.joint_pub.publish(js)
+        # Publish joint_states (same timestamp → no TF jitter)
+        if self.joint_names:
+            js = JointState()
+            js.header.stamp = stamp
+            js.name = self.joint_names
+            js.position = [0.0] * len(self.joint_names)
+            js.velocity = []
+            js.effort = []
+            self.joint_pub.publish(js)
 
 
 def main(args=None):
@@ -177,7 +203,7 @@ def main(args=None):
         pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        rclpy.try_shutdown()
 
 
 if __name__ == '__main__':

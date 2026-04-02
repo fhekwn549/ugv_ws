@@ -40,6 +40,7 @@ class FakeScanNode(Node):
         self.declare_parameter('range_max', 3.5)
         self.declare_parameter('noise_stddev', 0.01)
         self.declare_parameter('scan_frame', 'base_lidar_link')
+        self.declare_parameter('map_frame', 'map')
         self.declare_parameter('occupancy_threshold', 50)
         self.declare_parameter('enable_angle_crop', True)
         self.declare_parameter('angle_crop_min', 30.0)   # degrees
@@ -50,6 +51,7 @@ class FakeScanNode(Node):
         self.range_max = self.get_parameter('range_max').value
         self.noise_stddev = self.get_parameter('noise_stddev').value
         self.scan_frame = self.get_parameter('scan_frame').value
+        self.map_frame = self.get_parameter('map_frame').value
         self.occ_thresh = self.get_parameter('occupancy_threshold').value
         self.enable_angle_crop = self.get_parameter('enable_angle_crop').value
         self.angle_crop_min_rad = math.radians(
@@ -129,7 +131,7 @@ class FakeScanNode(Node):
         # Look up TF: map → scan_frame (same chain as real robot)
         try:
             tf = self.tf_buffer.lookup_transform(
-                'map', self.scan_frame, rclpy.time.Time())
+                self.map_frame, self.scan_frame, rclpy.time.Time())
         except TransformException as e:
             self._tf_fail_count += 1
             if self._tf_fail_count % 50 == 1:
@@ -224,6 +226,9 @@ class FakeScanNode(Node):
 
         # Write to /dev/shm for bridge (bypasses DDS delivery issues on WSL2)
         try:
+            # Namespace-safe shm path (e.g. 'ugv01_base_lidar_link')
+            safe_name = self.scan_frame.replace('/', '_').strip('_')
+            shm_name = safe_name if safe_name != 'base_lidar_link' else 'ugv_scan'
             shm_data = json.dumps({
                 "angle_min": self.angle_min,
                 "angle_max": self.angle_max,
@@ -232,10 +237,10 @@ class FakeScanNode(Node):
                 "range_max": self.range_max,
                 "ranges": ranges_list,
             }, separators=(",", ":"))
-            tmp = "/dev/shm/ugv_scan.json.tmp"
+            tmp = f"/dev/shm/{shm_name}.json.tmp"
             with open(tmp, "w") as f:
                 f.write(shm_data)
-            os.rename(tmp, "/dev/shm/ugv_scan.json")
+            os.rename(tmp, f"/dev/shm/{shm_name}.json")
         except Exception:
             pass
 
@@ -249,7 +254,7 @@ def main(args=None):
         pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        rclpy.try_shutdown()
 
 
 if __name__ == '__main__':
