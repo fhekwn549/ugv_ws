@@ -19,7 +19,9 @@
     api_port: 8081
 
     # ── OAuth2 JWT verification (empty = disabled) ──
-    oauth2_jwks_uri: "http://192.168.0.85:9020/oauth2/jwks"
+    # OAuth2 JWT verification (empty = disabled, enable in production)
+    # oauth2_jwks_uri: "http://192.168.0.85:9020/oauth2/jwks"
+    oauth2_jwks_uri: ""
 
     # ── SQLite database ──
     db_path: "~/ugv_bridge.db"
